@@ -1,0 +1,467 @@
+→ Number of reviews left by each review-leaver, in descending order. 
+
+select a.account_id, count(r.rating) from ecommerce.item_review as r, ecommerce.item as i, pheme.account as a
+where r.item_id = i.item_id
+and r.account_id = a.account_id
+group by a.account_id
+order by count(r.rating) desc;
+
+
+→ Email addresses of people who completed an order on AUT in April 2014, for Leah
+
+select a.email, o.oid
+from pheme.account as a, ecommerce.rsorder as o, ecommerce.paymentauthorization as pa
+where o.account_id = a.account_id
+and o.oid = pa.order_id
+and o.site_id = 346
+and pa.authdate > '2014-03-31'
+and pa.authdate < '2014-05-01'
+and pa.payment_transaction_result_id = 1 
+and pa.payment_status_id in (3,5,6)
+order by email asc;
+
+
+
+--> All campaigns ever, with the fields Nikki wants. 
+
+select c.title, c.campaign_tag, s.organization_name, ps.abbrv, c.date_released, c.record_added_by, c.date_last_modified, c.last_modified_by, t.name, cc.name
+from takeaction.campaign as c, takeaction.sponsor as s, takeaction.campaign_site as cs, takeaction.category as cc, takeaction.campaign_category as ccc, takeaction.status as t, panacea.site as ps
+where s.sponsor_id = c.sponsor_id
+and cs.campaign_id = c.campaign_id
+and cc.category_id = ccc.category_id
+and ccc.campaign_id = c.campaign_id
+and t.status_id = c.status_id
+and ps.site_id = cs.site_id;
+
+
+
+--> How many extra GGO checkbox contributions have we received? 
+
+select pv.name,sum(li.customerprice * li.quantity) from ecommerce.rslineitem li, ecommerce.sitelineitem sli,ecommerce.productversion pv where sli.sourceclass_id = 22 and sli.lineitem_id = li.oid and li.lineitemstatus_id > 1 and li.productversion_id = pv.productversion_id group by pv.name;
+
+select li.productversion_id, li.customerprice, sli.site_id, sum(li.customerprice * li.quantity) from ecommerce.rslineitem li, ecommerce.sitelineitem sli where sli.sourceclass_id = 22 and sli.lineitem_id = li.oid and li.lineitemstatus_id > 1 group by li.productversion_id, li.customerPrice, sli.site_id;
+
+
+--> What artisan records were modified today? 
+
+select count(*) from ecommerce.artisan where datelastmodified >= now()::DATE; 
+
+
+
+--> List of any versions that ought to have a Chimera e-mail (vendors 37 and 77), but don't. 
+
+select pv.productversion_id, pv.name from chimera.content as cc, ecommerce.productversion as pv, ecommerce.item as i
+where i.item_id = pv.item_id
+and i.vendor_id IN (37, 77)
+and pv.productversion_id not in (select cc.source_id from chimera.content as cc, panacea.source_class as psc, ecommerce.productversion as 
+pv where pv.productversion_id = cc.source_id
+and cc.source_class_id = psc.source_class_id
+and psc.source_class_id = 10)
+and pv.itemstatus_id IN (0, 1)
+group by pv.productversion_id, pv.name;
+
+
+--> How to find out what the IDs are for the various things that use bitmasks
+
+select * from ecommerce.sourceclass; 
+
+
+(from that, we can see that the item is "5". So,)
+
+
+
+--> How to find out what the current set of bits is in the item bitmask
+
+select * from ecommerce.sourcebitmask where sourceclass_id = 5; 
+
+
+
+
+--> How to find out what the current set of bits is for the SKU bitmask
+
+
+select * from ecommerce.sourcebitmask where sourceclass_id = 13; 
+
+
+--> List of all active categories not hooked up to any site
+
+select distinct category_id,name 
+from ecommerce.category 
+where active = true
+and category_Id not in (select category_Id from ecommerce.sitecategory);
+
+
+
+--> Are there any inactive categories hooked up to a site? (just old Sale categories)
+
+select distinct category_id,name 
+from ecommerce.category 
+where active = false
+and category_Id in (select category_Id from ecommerce.sitecategory);
+
+
+
+--> How many instances are there of various image types? 
+
+select keyName,count(*) 
+from ecommerce.ggproductimage 
+group by keyName; 
+
+
+--> Find launched work units modified after 10-01: 
+
+select * from in_progress.work_unit where status = 17 and updated_at > '2011-10-01 00:00:00';
+
+
+--> Find launched work units that are missing an item_id: 
+
+select image_notes, date_launched, id, name from in_progress.work_unit 
+where status = 17 
+and item_id is null
+order by id desc;
+
+
+--> Find the item ID of images with a certain filename
+
+select distinct item_id from ecommerce.ggproductimage where filename like 'h-PigHangDecor%';
+
+
+--> Who modified item status, and when, for item 49629?
+
+select * from ecommerce.source_product_status_history where source_id = 49629 and sourceclass_id=5; 
+
+
+
+--> How many times have individual users modified an item status? 
+
+select modified_by,count(*) from ecommerce.source_product_status_history group by modified_by order by count(*);
+
+--> Goal progress report (when - then - else - end)
+
+case 
+when now()::DATE - g.startDate::DATE = 0 
+then (date_part('day', now()::DATE) * 1.0) / (g.days_in_month * 1.0) 
+else 1.0 
+end 
+AS date_ratio
+
+
+--> Counts of active, inactive, and retired items by vendor, in table form
+
+select v.name
+	,sum(1 - abs(sign(i.itemstatus_id - 0))) as active
+	,sum(1 - abs(sign(i.itemstatus_id - 1))) as inactive
+	, sum(1 - abs(sign(i.itemstatus_id - 5))) as retired
+from ecommerce.vendor as v,ecommerce.item as i
+where v.vendor_id = i.vendor_id and v.active = true
+group by v.name
+
+
+
+--> Lifetime royalty sums by site (query takes awhile to run)
+
+select
+    i.item_id
+    ,st.itemstatus
+    ,i.name
+    ,sum(COALESCE(sli.quantity,0.00) * COALESCE(sli.donationAmount,0.00) * (1 - abs(sign(sli.site_id - 220)))) AS ths_royalty
+    ,sum(COALESCE(sli.quantity,0.00) * COALESCE(sli.donationAmount,0.00) * (1 - abs(sign(sli.site_id - 221)))) AS trs_royalty
+    ,sum(COALESCE(sli.quantity,0.00) * COALESCE(sli.donationAmount,0.00) * (1 - abs(sign(sli.site_id - 224)))) AS bcs_royalty
+    ,sum(COALESCE(sli.quantity,0.00) * COALESCE(sli.donationAmount,0.00) * (1 - abs(sign(sli.site_id - 310)))) AS ars_royalty
+    ,sum(COALESCE(sli.quantity,0.00) * COALESCE(sli.donationAmount,0.00) * (1 - abs(sign(sli.site_id - 314)))) AS chs_royalty
+    ,sum(COALESCE(sli.quantity,0.00) * COALESCE(sli.donationAmount,0.00) * (1 - abs(sign(sli.site_id - 342)))) AS ms_royalty
+    ,sum(COALESCE(sli.quantity,0.00) * COALESCE(sli.donationAmount,0.00) * (1 - abs(sign(sli.site_id - 343)))) AS prs_royalty
+    ,sum(COALESCE(sli.quantity,0.00) * COALESCE(sli.donationAmount,0.00) * (1 - abs(sign(sli.site_id - 344)))) AS ggf_royalty
+    ,sum(COALESCE(sli.quantity,0.00) * COALESCE(sli.donationAmount,0.00) * (1 - abs(sign(sli.site_id - 345)))) AS vet_royalty
+    ,sum(COALESCE(sli.quantity,0.00) * COALESCE(sli.donationAmount,0.00) * (1 - abs(sign(sli.site_id - 2001)))) AS lit_royalty
+from
+    ecommerce.ProductVersion pv
+    ,ecommerce.RSLineItem li
+    ,ecommerce.Item i
+    ,ecommerce.itemstatus st
+    ,ecommerce.SiteLineItem sli
+    ,ecommerce.PaymentAuthorization pa
+where
+    li.productVersion_id = pv.productVersion_id
+    and pv.item_id = i.item_id
+    and i.itemstatus_id = st.itemstatus_id
+    and li.oid = sli.lineItem_id
+    and li.order_id = pa.order_id
+    and pa.payment_transaction_result_id = 1
+    and pa.payment_status_id in (3,5)
+group by 
+    i.item_id
+    ,st.itemstatus
+    ,i.name
+order by 
+    i.item_id
+    ,st.itemstatus
+    ,i.name
+
+
+
+
+
+
+--> States we collect tax from, revenue and tax collected by year, in a pivot table
+
+select
+    date_trunc('year',t.trandate)::DATE as Year_Start
+    ,sum(t.amount *  (position(upper(a.state) IN 'CA') * position('CA' IN upper(a.state)))) AS CA_Sales
+    ,sum(o.tax *  (position(upper(a.state) IN 'CA') * position('CA' IN upper(a.state)))) AS CA_Tax
+    ,sum(t.amount *  (position(upper(a.state) IN 'CO') * position('CO' IN upper(a.state)))) AS CO_Sales
+    ,sum(o.tax *  (position(upper(a.state) IN 'CO') * position('CO' IN upper(a.state)))) AS CO_Tax
+    ,sum(t.amount *  (position(upper(a.state) IN 'MI') * position('MI' IN upper(a.state)))) AS MI_Sales
+    ,sum(o.tax *  (position(upper(a.state) IN 'MI') * position('MI' IN upper(a.state)))) AS MI_Tax
+    ,sum(t.amount *  (position(upper(a.state) IN 'OH') * position('OH' IN upper(a.state)))) AS OH_Sales
+    ,sum(o.tax *  (position(upper(a.state) IN 'OH') * position('OH' IN upper(a.state)))) AS OH_Tax
+    ,sum(t.amount *  (position(upper(a.state) IN 'WA') * position('WA' IN upper(a.state)))) AS WA_Sales
+    ,sum(o.tax *  (position(upper(a.state) IN 'WA') * position('WA' IN upper(a.state)))) AS WA_Tax
+from
+    ecommerce.RSOrder o
+    ,ecommerce.RSAddress a
+    ,ecommerce.PaymentAuthorization pa
+    ,(select authorization_id,tranDate,amount from ecommerce.PaymentTransaction where payment_transaction_result_id = 1 and payment_transaction_type_id = 4
+	) t
+where
+    coalesce(o.shippingAddress_id,o.billingAddress_id) = a.oid
+    and o.oid = pa.order_id
+    and a.country = 'United States'
+    and pa.authorization_id = t.authorization_id 
+group by
+    date_trunc('year',t.trandate)::DATE
+order by
+    date_trunc('year',t.trandate)::DATE;
+
+
+
+
+
+--> Lifetime GTGM sales rolled up by item
+
+select
+    i.item_id,i.name as version_name,count(distinct li.order_id),count(*),sum(li.customerprice)
+from
+    ecommerce.vendor as v
+    ,ecommerce.item as i
+    ,ecommerce.productversion as pv
+    ,ecommerce.rslineitem as li
+    ,ecommerce.paymentauthorization as pa
+where
+    v.vendor_id = 77
+    and v.vendor_id = i.vendor_id
+    and i.item_id = pv.item_id
+    and pv.productversion_id = li.productversion_Id
+    and li.order_id = pa.order_id
+    and pa.payment_transaction_result_id=1
+    and pa.payment_status_id in (3,5,6)
+group by i.item_id,i.name
+order by sum(li.customerprice) desc
+
+
+
+
+--> Lifetime Daily Deal sales (for Daily Deal items back when it was all under promotion 41)
+
+select
+    i.item_id,pv.name as version_name,count(distinct li.order_id),count(*),sum(li.customerprice),pa.authdate
+from
+    ecommerce.item as i
+    ,ecommerce.productversion as pv
+    ,ecommerce.rslineitem as li
+    ,ecommerce.paymentauthorization as pa
+    ,ecommerce.price as p
+where
+    i.item_id = pv.item_id
+    and pv.productversion_id = li.productversion_Id
+    and li.order_id = pa.order_id
+    and pa.payment_transaction_result_id=1
+    and p.source_id = i.item_id
+    and pa.payment_status_id in (3,5,6)
+    and p.promotion_id = 41
+group by i.item_id,pv.name
+order by pa.authdate desc;
+
+
+
+--> Lifetime GTGM sales by version name
+
+select
+    i.item_id,pv.name as version_name,count(distinct li.order_id),count(*),sum(li.customerprice)
+from
+    ecommerce.vendor as v
+    ,ecommerce.item as i
+    ,ecommerce.productversion as pv
+    ,ecommerce.rslineitem as li
+    ,ecommerce.paymentauthorization as pa
+where
+    v.vendor_id = 77
+    and v.vendor_id = i.vendor_id
+    and i.item_id = pv.item_id
+    and pv.productversion_id = li.productversion_Id
+    and li.order_id = pa.order_id
+    and pa.payment_transaction_result_id=1
+    and pa.payment_status_id in (3,5,6)
+group by i.item_id,pv.name
+order by sum(li.customerprice) desc
+
+
+--> Shelter Challenge: Votes of top 10 shelters for the week of 07/04 to 07/10/2011:
+
+select t.shelter_id, count(*) as vote_count
+from
+    (
+        select
+          date_trunc('day', date_voted) as vote_date,
+          shelter_id,
+          ip_address,
+          to_char(date_voted, 'AM') as time_of_day
+        from chimera.shelter_vote
+        where  date_voted >= '2011-07-04'
+        and date_voted < '2011-07-11'
+        group by
+          vote_date,
+          shelter_id,
+          ip_address,
+          time_of_day
+    ) t
+group by t.shelter_id
+order by count(*) desc;
+
+
+--> Status changes 
+
+select sourceclass_id,previous_itemstatus_id,new_itemstatus_id,count(*) 
+from ecommerce.source_product_status_history 
+where date_record_added >= '20111001' 
+group by sourceclass_id,previous_itemstatus_id,new_itemstatus_id; 
+
+
+--> Status changes for September only
+
+select sourceclass_id,previous_itemstatus_id,new_itemstatus_id,count(*) 
+from ecommerce.source_product_status_history 
+where date_record_added >= '20110901' and date_record_added < '20111001' 
+group by sourceclass_id,previous_itemstatus_id,new_itemstatus_id; 
+
+
+--> Status changes from any other status to "Active" for a certain set of items
+
+select i.item_id, sh.previous_itemstatus_id, sh.new_itemstatus_id, sh.date_record_added
+from ecommerce.source_product_status_history as sh, ecommerce.item as i
+where i.item_id = sh.source_id
+and sh.sourceclass_id = 5
+and sh.new_itemstatus_id = 0
+and i.item_id IN (ridiculously long list of item_ids )
+order by i.item_id asc; 
+
+
+→ ALL Launched items (going to “Active” for the first time), by a certain month. CATCHES TOO MUCH
+
+select count(*)
+from ecommerce.source_product_status_history as sh, ecommerce.item as i
+where i.item_id = sh.source_id
+and sh.sourceclass_id = 5
+and sh.previous_itemstatus_id IN (2, 3, 4)
+and sh.new_itemstatus_id = 0
+and sh.date_record_added >= '2014-01-01' 
+and sh.date_record_added < '2014-02-01'; 
+
+
+
+→ CKSB items that were launched in a certain month. 
+
+select count(*)
+from ecommerce.source_product_status_history as sh, ecommerce.item as i
+where i.item_id = sh.source_id
+and sh.sourceclass_id = 5
+and sh.previous_itemstatus_id IN (2, 3, 4)
+and sh.new_itemstatus_id = 0
+and sh.date_record_added >= '2015-04-01' 
+and sh.date_record_added < '2015-05-01'
+and i.primary_site_id IN (351, 352); 
+
+
+→ Family Pet item launches for a certain timeframe
+
+select count(*)
+from ecommerce.source_product_status_history as sh, ecommerce.item as i
+where i.item_id = sh.source_id
+and sh.sourceclass_id = 5
+and sh.previous_itemstatus_id IN (2, 3, 4)
+and sh.new_itemstatus_id = 0
+and sh.date_record_added >= '2015-04-01' 
+and sh.date_record_added < '2015-05-01'
+and i.store_availability_mask = 24; 
+
+
+→ For Julia / Erika: queries on what items were launched in a certain month. 
+
+QUERY ONE: Only non-CKSB and non-Family Pet CUSA items
+
+select count(*)
+from ecommerce.source_product_status_history as sh, ecommerce.item as i
+where i.item_id = sh.source_id
+and sh.sourceclass_id = 5
+and sh.previous_itemstatus_id IN (2, 3, 4)
+and sh.new_itemstatus_id = 0
+and sh.date_record_added >= '2015-04-01' 
+and sh.date_record_added < '2015-05-01'
+and i.vendor_id IN (83, 94)
+and i.store_availability_mask != 24
+and i.primary_site_id NOT IN (351, 352); 
+
+QUERY TWO: DROPSHIP vendors (so; no GGO, GTGM Special Case, Novica, CUSA, or CUSA On Demand items)
+
+select count(*)
+from ecommerce.source_product_status_history as sh, ecommerce.item as i
+where i.item_id = sh.source_id
+and sh.sourceclass_id = 5
+and sh.previous_itemstatus_id IN (2, 3, 4)
+and sh.new_itemstatus_id = 0
+and sh.date_record_added >= '2015-04-01' 
+and sh.date_record_added < '2015-05-01'
+and i.vendor_id NOT IN (77, 81, 83, 89, 94); 
+
+
+QUERY THREE: CUSA-shipped CKSB items
+
+select count(*)
+from ecommerce.source_product_status_history as sh, ecommerce.item as i
+where i.item_id = sh.source_id
+and sh.sourceclass_id = 5
+and sh.previous_itemstatus_id IN (2, 3, 4)
+and sh.new_itemstatus_id = 0
+and sh.date_record_added >= '2015-04-01' 
+and sh.date_record_added < '2015-05-01'
+and i.vendor_id = 83
+and i.primary_site_id IN (351, 352); 
+
+
+
+--> CharityUSA items that went from Active to Inactive in a certain timeframe. 
+
+select i.item_id, i.name
+from ecommerce.source_product_status_history as sh, ecommerce.item as i
+where sh.source_id = i.item_id
+and sh.date_record_added >= '2012-12-28 15:29:00' 
+and sh.date_record_added < '2013-01-02 08:41:00'
+and sh.sourceclass_id = 5
+and sh.previous_itemstatus_id = 0
+and i.vendor_id = 83
+and sh.new_itemstatus_id = 1; 
+
+
+
+
+--> Figuring out the new item-status-change-tracking stuff
+
+select sc.sourceclass,s.name,h.date_record_added from ecommerce.sku as s,ecommerce.source_product_status_history as h,ecommerce.sourceclass as sc where s.sku_id = h.source_id and h.sourceclass_id = sc.sourceclass_id and h.date_record_added > '20111004' and h.new_itemstatus_id = 1;
+
+
+For the store splash page content... 
+
+background images are:  /store/images/background-splash-contentBoxes-" + site.getId() + ".gif
+
+splash page pictures are  /store/images/splash-picture-" + site.getId() + "-").append(Math.round(Math.random() * 9)).append(".jpg
+so splash-picture-344-[0-9].jpg   randomly select from the 10 there.

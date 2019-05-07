@@ -1,0 +1,2976 @@
+Ashes of Tango
+
+Rise by Origa
+Lips of an Angel by Hinder
+Down with the Sickness by Disturbed
+Face Down by The Red Jumpsuit Apparatus
+God's Gonna Cut You Down by Johnny Cash
+Re-Education (Through Labor) by Rise Against
+New Divide by Linkin Park
+So Far Away by Staind
+Facade by Disturbed
+Fake It by Seether
+Everybody's Fool by Evanescence
+Gone Forever by Three Days Grace
+
+Want it Back by Amanda Palmer
+Jar of Hearts 
+Somebody that I used to know
+Hallelujah by Jeff Buckley
+
+
+Yeliz Vatansever, Istanbul
+Bryan Hole, City Brewing Company
+HEATHER FAY, Musician & Mama
+Gerie Jinx
+Paul Gottesburen
+Moh. Saefudin Zukhri, TARUNA MULTIMEDIA Corps. SMKN3 TEGAL
+Scott Slayden, Little Rock, AR
+Suzanne Najbrt
+
+
+
+
+
+
+--> Accounts that have placed one or more orders after Sept.30, that are now status "processed," that had a summed tax-deductible amount of $100+. (On Nov. 6, I got 401 records returned.)
+
+select o.account_id, a.email, rsa.firstname, rsa.lastname, rsa.phone, sum(COALESCE(li.quantity,0) * COALESCE(pr.customerPrice,0.00)) AS tax_deduct_amount
+from ecommerce.Item as i, ecommerce.rsorder as o, ecommerce.rslineitem as li, ecommerce.productversion as pv, ecommerce.price as pr, ecommerce.PaymentAuthorization as pa, ecommerce.MerchantAccount as ma, pheme.account as a, 
+ecommerce.rsaddress as rsa
+where i.vendor_id = 77 
+and i.item_id = pv.item_id 
+and o.oid = li.order_id
+and li.productversion_id = pv.productversion_id
+and li.order_id = pa.order_id 
+and rsa.oid = o.billingaddress_id
+and pr.source_id = li.productVersion_id 
+and pr.priceType_id = 4 and pr.sourceClass_id = 9 
+and pa.payment_transaction_result_id = 1 
+and pa.payment_status_id in (3,5) 
+and pa.authDate::DATE > '2012-09-30'
+and COALESCE(pv.initialLaunchDate,date_trunc('month',now()::DATE) - cast('1 month' as interval))::DATE <= pa.authDate::DATE 
+and pa.merchantaccount_id = ma.merchantaccount_id 
+and o.account_id = a.account_id
+and li.quantity * li.customerPrice >= 100
+group by o.account_id, a.email, rsa.firstname, rsa.lastname, rsa.phone
+order by tax_deduct_amount desc;
+
+
+--> Accounts that have placed one or more orders after Sept.30, that are now status "processed," that had a summed tax-deductible amount of $100+, with detail about what GTGM(s) they ordered. 
+
+step 1
+
+(create temp table)
+
+select o.account_id,sum(COALESCE(li.quantity,0) * COALESCE(pr.customerPrice,0.00)) AS tax_deduct_amount
+into temp_accounts
+from ecommerce.Item as i, ecommerce.rsorder as o, ecommerce.rslineitem as li, ecommerce.productversion as pv, ecommerce.price as pr, ecommerce.PaymentAuthorization as pa, ecommerce.MerchantAccount as ma
+where i.vendor_id = 77 
+and i.item_id = pv.item_id 
+and o.oid = li.order_id
+and li.productversion_id = pv.productversion_id
+and li.order_id = pa.order_id 
+and pr.source_id = li.productVersion_id 
+and pr.priceType_id = 4 and pr.sourceClass_id = 9 
+and pa.payment_transaction_result_id = 1 
+and pa.payment_status_id in (3,5) 
+and pa.authDate::DATE >= '20121001'
+and pa.merchantaccount_id = ma.merchantaccount_id 
+group by o.account_id
+having sum(COALESCE(li.quantity,0) * COALESCE(pr.customerPrice,0.00)) > 100.00
+order by o.account_id asc; 
+
+
+step 2
+
+
+(join to temp table)
+
+select o.account_id, a.email, rsa.firstname, rsa.lastname, rsa.phone, o.oid as order_id, pv.name, sum(COALESCE(li.quantity,0) * COALESCE(pr.customerPrice,0.00)) AS tax_deduct_amount,ta.tax_deduct_amount as total_contribution
+from ecommerce.Item as i, ecommerce.rsorder as o, ecommerce.rslineitem as li, ecommerce.productversion as pv, ecommerce.price as pr, ecommerce.PaymentAuthorization as pa, ecommerce.MerchantAccount as ma, pheme.account as a, 
+ecommerce.rsaddress as rsa,temp_accounts as ta
+where ta.account_id = o.account_id
+and i.vendor_id = 77 
+and i.item_id = pv.item_id 
+and o.oid = li.order_id
+and li.productversion_id = pv.productversion_id
+and li.order_id = pa.order_id 
+and rsa.oid = o.billingaddress_id
+and pr.source_id = li.productVersion_id 
+and pr.priceType_id = 4 and pr.sourceClass_id = 9 
+and pa.payment_transaction_result_id = 1 
+and pa.payment_status_id in (3,5) 
+and pa.authDate::DATE > '20121001'
+and pa.merchantaccount_id = ma.merchantaccount_id 
+and o.account_id = a.account_id
+group by o.account_id, a.email, rsa.firstname, rsa.lastname, rsa.phone, o.oid, pv.name,ta.tax_deduct_amount
+order by o.account_id asc; 
+
+
+
+--> GTGM purchased in 2012. (That is -- in orders that were completed in 2012, that are in payment statuses 3, 5, or 6.)
+
+select
+    i.item_id,pv.name as version_name,count(distinct li.order_id),count(*),sum(li.customerprice)
+from
+    ecommerce.vendor as v
+    ,ecommerce.item as i
+    ,ecommerce.productversion as pv
+    ,ecommerce.rslineitem as li
+    ,ecommerce.paymentauthorization as pa
+where
+    v.vendor_id = 77
+    and v.vendor_id = i.vendor_id
+    and i.item_id = pv.item_id
+    and pv.productversion_id = li.productversion_Id
+    and li.order_id = pa.order_id
+    and pa.payment_transaction_result_id=1
+    and pa.payment_status_id in (3,5,6)
+    and pa.authDate > '2011-12-31'
+    and pa.authDate < '2013-01-01'
+group by i.item_id,pv.name
+order by sum(li.customerprice) desc
+
+
+
+
+--> All campaigns ever, with the fields Nikki wants. 
+
+select c.title, c.campaign_tag, s.organization_name, ps.abbrv, c.date_released, c.record_added_by, c.date_last_modified, c.last_modified_by, t.name, cc.name
+from takeaction.campaign as c, takeaction.sponsor as s, takeaction.campaign_site as cs, takeaction.category as cc, takeaction.campaign_category as ccc, takeaction.status as t, panacea.site as ps
+where s.sponsor_id = c.sponsor_id
+and cs.campaign_id = c.campaign_id
+and cc.category_id = ccc.category_id
+and ccc.campaign_id = c.campaign_id
+and t.status_id = c.status_id
+and ps.site_id = cs.site_id;
+
+
+
+
+select * from ecommerce.inventoryitem_adjustment where destination_inventoryitem_id = 189393;
+
+select * from ecommerce.rsinventoryitem where sku_id = 59775
+order by receivingevent_id desc;
+
+
+--> Get the oids for the two addresses on order 16946454
+
+select billingaddress_id, shippingaddress_id from ecommerce.rsorder where oid = 16946454;
+
+
+
+--> Look at the info for those two addresses
+
+select * from ecommerce.rsaddress where oid IN (7493064, 7493063);
+
+
+
+
+
+
+Specifically looking for:
+
+* Brad fixed PHOENIX-147 (http://fang.greatergood.net:8081/issue/PHOENIX-147), which was the bug from 7 months ago (!) where the free jewelry gift box was getting given away for every ITEM in the cart, not for every qualifying jewelry category item in the cart. We've been working around this by dumping all the qualifying jewelry items into a category and keying the free jewelry box promotions off of that category, instead of off of a combination of vendor and category conditions. Anyway, Brad has checked a fix into dev, and this promotion type needs retesting, which I will do, but some help would be great!
+
+* Can we now have a promotion for, say, X% off "the entire store," that actually excludes GTGM and gift certificates the way it's supposed to? 
+
+* Testing a promotion where we set an action of "ROYALTY_FACTOR" "1". The intent is not to "double" the royalty, but instead, to set the royalty promotion on the cart during checkout, so the # of carts can be queried later. This is in response to PHOENIX-98, "Create promotion-code based Extra Donation to show in cart". Brad's suggestion is, "we should be able to just use a royalty factor of one. This would allow us to enforce a coupon code and easily count the number of orders to which it has been applied. (select count(*) from commerce.orderpromotion where promotion_id = xxx for those playing along at home, although there's a report for that). Off the top of my head I'm not sure how any messaging might get handled in this case, if at all. It may show the promotion's message or just display the donation amount on the line item as it would have regardless. Let me know where we would like to display any further messaging and I can take a look, I might be able to pull off something similar to the BOGO panel case and display info based on promotion actions if needed. "
+
+
+
+<p><strong>Lisa Halstead, President</strong><br />
+Lisa Halstead is the Chief Operating Officer of CharityUSA.com, LLC, with more than 20 years of experience in technology marketing and management, and eight years generating funds for nonprofits through the Internet and online activism. Lisa brings expertise in organizational planning, personnel management, facilities management and public relations. She has volunteered with a number of health service and educational organizations throughout her career.</p>
+
+
+--> Active GTGM versions with a an active tex deductible price of less than $15
+
+select pv.productversion_id, p.customerprice from ecommerce.productversion as pv, ecommerce.item as i, ecommerce.price as p
+where pv.item_id = i.item_id
+and p.source_id = pv.productversion_id
+and i.vendor_id = 77
+and i.itemstatus_id = 0
+and p.active = true
+and p.pricetype_id = 4
+and p.customerprice < 15
+order by productversion_id;
+
+
+
+
+
+--> Look at all item reviews so far
+
+select i.item_id, i.name, r.rating, r.is_included, a.email, r.date_record_added, r.comment from ecommerce.item_review as r, ecommerce.item as i, pheme.account as a
+where r.item_id = i.item_id
+and r.account_id = a.account_id
+order by r.date_record_added desc;
+
+
+
+
+
+
+
+--> How many of each rating are there?
+
+select rating,count(*) from ecommerce.item_review group by rating order by rating;
+
+
+--> Items with more than one review, and their average rating
+
+select ir.item_id,i.name,count(*),avg(ir.rating) 
+from ecommerce.item_review as ir,ecommerce.item as i 
+where ir.item_Id = i.item_Id 
+and ir.is_included=true 
+group by ir.item_Id,i.name 
+having count(*) > 1 
+order by ir.item_id;
+
+--> Accounts that have written more than one review, and the # of reviews they've written
+
+select ir.account_id,a.email,count(*) From ecommerce.item_review as ir,pheme.account as a where ir.account_id = a.account_id group by ir.account_id,a.email having count(*) > 1 order by count(*); 
+
+
+
+
+
+--> look for dupe PetEdge SKU supplier part #s, forcing all to lower-case in order to catch duplications
+
+select lower(s.partnumber),count(*) 
+from ecommerce.sku as s, ecommerce.item as i 
+where i.item_id = s.item_id 
+and i.vendor_id = 85 
+group by lower(s.partnumber)
+order by count desc; 
+
+
+--> Find all PetEdge SKU supplier part #s
+
+select s.partnumber, s.sku_id from ecommerce.sku as s, ecommerce.item as i
+where i.item_id = s.item_id
+and i.vendor_id = 85
+group by s.partnumber, s.sku_id;
+
+
+
+--> Looking to put supplier names into work units that are missing such
+
+select w.id, w.supplier_name, s.suppliername
+from in_progress.work_unit w, ecommerce.item i, ecommerce.sku sk, ecommerce.rsinventoryitem ii, ecommerce.supplier s
+where w.supplier_name is null 
+and w.item_id = i.item_id
+and sk.item_id = i.item_id
+and ii.sku_id = sk.sku_id
+and ii.supplier_id = s.supplier_id
+and w.supplier_name like '%' || s.suppliername || '%' 
+and w.supplier_name != s.suppliername;
+
+Currently 0 results...
+
+
+
+--> Mass-change all Partially Complete Novica SKUs to Inactive (this is used in the launch of a new "feed" of Novica items)
+
+update ecommerce.sku
+set itemstatus_id = 1
+where itemstatus_id = 3
+and name like 'Novica%';
+
+(note: it takes a really long time for this to show up in Fawkes!)
+
+
+--> Mass-change all Partially Complete Novica items to Inactive (this is the second part of the step that's only used when launching a new feed of items)
+
+update ecommerce.item 
+set itemstatus_id = 1
+where itemstatus_id = 3
+and vendor_id = 81;
+
+
+--> Check for (active & inactive) Novica items that have no artisan set
+
+select item_id, name from ecommerce.item 
+where vendor_id = 81
+and artisan_id is null
+and itemstatus_id IN (0,1);
+
+
+--> Check for artisans without images
+
+select artisan_id, artisanname from ecommerce.artisan
+where imageurl is null;
+
+
+
+--> Looking for PetEdge orders
+
+select li.order_id, o.orderdate, li.fulfillmentdate from ecommerce.rslineitem as li, ecommerce.rsorder as o, ecommerce.productversion as v, ecommerce.item as i, ecommerce.paymentauthorization as pa
+where li.productversion_id = v.productversion_id
+and li.order_id = o.oid
+and v.item_id = i.item_id
+and i.vendor_id = 85
+and li.order_id = pa.order_id
+and pa.payment_transaction_result_id=1
+and pa.payment_status_id in (3,5,6);
+
+select li.order_id, o.orderdate, s.trackingnumber, li.fulfillmentdate from ecommerce.rslineitem as li, ecommerce.rsorder as o, ecommerce.productversion as v, ecommerce.item as i, ecommerce.paymentauthorization as pa, ecommerce.ordershipment as s
+where o.oid = s.order_id
+and li.productversion_id = v.productversion_id
+and li.order_id = o.oid
+and v.item_id = i.item_id
+and i.vendor_id = 85
+and li.order_id = pa.order_id
+and pa.payment_transaction_result_id=1
+and pa.payment_status_id in (3,5,6);
+
+
+
+--> Set the extra contribution on THS as follows:
+
+insert into ecommerce.cart_site_donation (cart_site_donation_id, site_id, productversion_id, display_message) values (2, 220, 57536, 'Add a $5 donation to GreaterGood.org');
+
+
+
+--> How many extra GGO checkbox contributions have we received? 
+
+select pv.name,sum(li.customerprice * li.quantity) from ecommerce.rslineitem li, ecommerce.sitelineitem sli,ecommerce.productversion pv where sli.sourceclass_id = 22 and sli.lineitem_id = li.oid and li.lineitemstatus_id > 1 and li.productversion_id = pv.productversion_id group by pv.name;
+
+select li.productversion_id, li.customerprice, sli.site_id, sum(li.customerprice * li.quantity) from ecommerce.rslineitem li, ecommerce.sitelineitem sli where sli.sourceclass_id = 22 and sli.lineitem_id = li.oid and li.lineitemstatus_id > 1 group by li.productversion_id, li.customerPrice, sli.site_id;
+
+
+
+https://store.greatergood.net/onlinereports/sales.do?method=sourceClassRevenue&start=01-03-2012&end=01-04-2012
+
+
+
+--> Attempt to overwrite a substring with a different substring... fruitless so far
+
+update ecommerce.item overlay('more than $10.00' placing '$10.00 or more' from 1 for 16) where itemdescription like '%of more than $10.00 in your cart%';
+
+
+--> Count of SKUs with a tariff code set in Cassandra
+
+select count(distinct poli.sku_id) 
+from ecommerce.inbound_shipment_line_item as isl, ecommerce.purchaseorderlineitem as poli 
+where poli.polineitem_id = isl.po_line_item_id 
+and isl.tariff_code is not null;
+
+
+
+--> PO surcharge type cleanup (type Agent Fee, 32)
+
+select distinct li.purchaseorder_id from ecommerce.purchaseorderlineitem as li, ecommerce.purchaseorder as po
+where li.purchaseorder_id = po.purchaseorder_id
+and po.flat_rate_surcharge is null
+and po.purchaseorderstatus_id = 4
+and li.flatratesurcharge is not null
+and li.surchargetype_id = 32
+group by li.purchaseorder_id having count(*) > 1
+order by li.purchaseorder_id desc;
+
+
+select distinct li.purchaseorder_id from ecommerce.purchaseorderlineitem as li, ecommerce.purchaseorder as po
+where li.purchaseorder_id = po.purchaseorder_id
+and po.flat_rate_surcharge is null
+and po.purchaseorderstatus_id = 4
+and li.flatratesurcharge is not null
+and li.surchargetype_id = 32
+order by li.purchaseorder_id desc;
+
+
+
+update ecommerce.purchaseorderlineitem set flatratesurcharge = null, surchargetype_id = null where purchaseorder_id = 22380 and sku_id = 55345;
+
+
+
+
+--> Turn all the active Jasmere SKUs to Retired
+
+update ecommerce.sku set itemstatus_id = 5
+where sku_id IN (select s.sku_id from ecommerce.sku as s, ecommerce.item as i
+where s.item_id = i.item_id
+and s.itemstatus_id = 0 
+and i.vendor_id = 86) ;
+
+
+
+
+
+--> SKUs with more than one active inventory record at qty. 0
+
+select sku.sku_id from 
+(select s.sku_id, ii.oid, s.name
+from ecommerce.rsinventoryitem as ii, ecommerce.sku as s, ecommerce.item as i
+where ii.sku_id = s.sku_id
+and s.item_id = i.item_id
+and ii.quantity = 0
+and i.vendor_id = 83
+and ii.active = true
+order by ii.oid asc) as sku
+group by sku.sku_id
+having count (*) > 1;
+
+
+--> Landed cost for a certain SKU
+
+select (poli.unitprice + ((COALESCE(s.freight_cost,0.00) + COALESCE(s.freight_forward_invoice_amount,0.00) 
++ COALESCE(s.duty_invoice_amount,0.00) + COALESCE(s.additional_duty_amount,0.00) + COALESCE(s.exam_fee,0.00)) 
+/ shipment_quantity) + (COALESCE(sli.fees,0.00) / sli.quantity) + (COALESCE(poli.flatRateSurcharge,0.00) 
+/ cast(poli.quantityordered as float)) + (COALESCE(sli.duty_percent,0.00) *.01 * poli.unitprice) 
++ COALESCE(poli.unitSurcharge,0.00)) from ecommerce.rsinventoryitem ii, ecommerce.sku, 
+ecommerce.receivingevent re, ecommerce.purchaseorderlineitem poli, ecommerce.inbound_shipment_line_item sli, 
+ecommerce.inbound_shipment s,
+  (select sli.inbound_shipment_id as shipment_id,sum(sli.quantity) as shipment_quantity 
+  from ecommerce.inbound_shipment_line_item sli 
+  group by inbound_shipment_id) as tsq 
+where re.polineitem_id = poli.polineitem_id 
+and sli.po_line_item_id = poli.polineitem_id 
+and sli.inbound_shipment_id = s.inbound_shipment_id 
+and sku.sku_id = ii.sku_id 
+and ii.receivingevent_id = re.receivingevent_id 
+and ii.quantity > 0
+and s.inbound_shipment_id = tsq.shipment_id 
+and ii.sku_id = 68269;
+
+
+
+
+
+--> Any Inactive necklace with an Active pendant kitted with an Inactive chain (useful in case of accidental chain deactivation)
+
+--> Any active Versions with a SKU quantity attached where the inventory cannot actually be fulfilled (i.e., set of 2 with only 1 left in inventory)
+
+--> Are there any Active versions whose item has an option group, but that don't have an option themselves? 
+
+--> Are there any active items such that two active versions share the same option? 
+
+--> Are there any Active items with a piece of "meta description" content (old style) that has a missing quotation mark at the beginning or end? (i.e., ends with /> without the " in front of the slash)
+
+--> Migrating old style meta description and keywords over to new style.... searches on what remains to be done there
+
+--> Are there any pieces of meta description that have the word "shit" in them? 
+
+--> Get a table of all matched items on active GTGM
+
+select i2.item_id, i2.name, i2.itemstatus_id, mi.child_item_id, i.name from ecommerce.item as i, ecommerce.matching_item as mi, ecommerce.item as i2 
+where mi.parent_item_id = i2.item_id
+and i.item_id = mi.child_item_id
+and i.vendor_id = 77;
+
+
+
+--> Discrepancies between amount received by FC and amount on the equivalent SLI
+
+select sli.inbound_shipment_id, sli.shipment_line_item_id, (re.totalreceivedcount - sli.quantity) as delta from ecommerce.receivingevent as re, ecommerce.inbound_shipment_line_item as sli, ecommerce.purchaseorderlineitem as poli
+where sli.po_line_item_id = poli.polineitem_id
+and re.polineitem_id = poli.polineitem_id
+
+(how to get the discrepancy part?...)
+
+
+
+
+QUERIES TO RUN ON A REGULAR BASIS
+
+--> What inactive items have ONLY retired SKUs (and no other SKUs)? (Note: This query isn't perfect, but it gets the job done, and finds some other crap that should get found too!)
+
+select v.name, v.productversion_id, v.itemstatus_id, i.item_id, i.name 
+from ecommerce.productversion as v, ecommerce.item as i
+where v.item_id = i.item_id
+and i.vendor_id = 83
+and i.itemstatus_id = 1
+and i.item_id NOT IN (select iv.item_id from ecommerce.productversion as iv
+where iv.itemstatus_id = 0)
+and i.item_id NOT IN (select iv.item_id from ecommerce.productversion as iv
+where iv.itemstatus_id = 1)
+order by i.item_id desc;
+
+
+
+--> Active items without any active versions (this ought to be taken care of by the "out of stock" process)
+
+select i.item_id, i.name from ecommerce.item as i, ecommerce.productversion as pv
+where i.item_id = pv.item_id
+and i.itemstatus_id = 0
+and i.item_id NOT IN (select iv.item_id from ecommerce.productversion as iv
+where iv.itemstatus_id = 0);
+
+
+--> Active SKUs that are not hooked up to any version and that are not on the IP queue
+
+select s.sku_id, s.name, s.item_id, s.initiallaunchdate from ecommerce.sku as s, ecommerce.rsinventoryitem as rs, ecommerce.item as i
+where s.item_id = i.item_id
+and s.sku_id = rs.sku_id
+and s.itemstatus_id = 0 
+and s.sku_id not in (select sku_id from ecommerce.productversionsku)
+and s.initiallaunchdate >= date_trunc('month',now()::DATE) - cast('13 month' as interval)
+and i.item_id not in (select ip.item_id from in_progress.work_unit as ip where ip.item_id = i.item_id and ip.work_unit_group_id is not null)
+group by i.item_id, s.sku_id, s.name, s.item_id, s.initiallaunchdate
+order by i.item_id asc;
+
+
+
+$1,000 level: 11 months
+$2,000 level: 6 months
+$3,000 level: 5 months
+$4,000 level: 8 months (this was during the stock market doldrums!)
+$5,000 level: 3 months (and I added an extra $200 at the end)
+$6,000 level: 6 months 
+$7,000 level: 5 months
+$8,000 level: 2 months (Nov, Dec) 
+$9,000 level: 
+$10,000 level: 
+$11,000 level: 
+$12,000 level: 
+$13,000 level: 
+$14,000 level: 
+$15,000 level: 
+$16,000 level: 
+
+Looks like moving from $1K to $2K took 11 months
+and then moving from $2K to $4K took another 11 months
+and from $4K to $6K took another 11 months
+and from $6K to $8K took another 11 months. 
+I suppose I can expect that it will take 11 months total to reach $10K, and 2 are already gone -- so, 9 more months? say, September 2013? 
+
+
+
+How much money saved would be "enough"? 
+
+Three months of my own personal spending, ($500 out of about $1200 = 41.6%) 
+three months of my contributions to joint, (about $3,500 out of $4,875, = 72%)
+$10,000 in my Roth IRA. (8.5 out of 10, = 85%)
+
+$12,500 / $16,075 = 77.77% to current savings goals!
+
+(After these savings goals are reached, I will make new, higher ones for myself -- six months of my own personal spending, six months of my contributions to join, and $20K in my IRA!)
+
+
+
+New paycheck amount: $1145.71 (instead of $1251.83)
+
+$1912.19 (yay) minus $150 for Vanguard = $1762.19
+plus $1145.71 = $2907.90
+minus $1352.99 for Citi, $253.95 for AmEx, $116.41 for Nelnet, $54 for Sharebuilder = $1130.55
+
+Figure another $400 for food... and another $200 for misc... I should still have $530.55 to re-save. 
+
+I just moved a total of $282.22 into my three savings accounts so each one of the three is at $166.67. 
+I still owe myself more... maybe about another $250 more... but I'll hold off until the next paycheck, and rein in my spending in the meantime! :-)
+
+FIXED expenses: $150 Vanguard, $116.41 Nelnet, $54 Sharebuilder = $320.41 per month
+leaving a total of $825.30 to cover the month's household food, gas, household supplies and items, clothes, school stuff, restaurants, and entertainment. 
+
+
+
+
+
+
+
+
+title: Project Manager, Information Technology (IT)
+
+Payscale.com, Glassdoor.com, Salary.com
+Find range of salaries, then gauge where I fit into the hierarchy based on skills & experience. 
+
+dream companies
+tier 1
+tier 2
+
+
+natural networking
+
+
+
+
+
+
+
+
+Mindless Eating: Why We Eat More Than We Think
+A book ostensibly about our invisible eating habits that is actually a deeply researched, phenomenally interesting book on our behavior. If you've ever wondered why you can't lose weight even though you really want to, this book will explain how our situational circumstances are profoundly related to our behavior. Read this and you will never think the same about food or health again.
+
+Age of Propaganda: The Everyday Use and Abuse of Persuasion
+One of my favorite books on understanding why we behave the way we do. Aronson, the co-author, guest-lectured at Stanford and his class was one of the most thought-provoking ones I ever took. Learn how the media, our friends, and even we ourselves cause us to behave in unexpected ways. Each and every aspect of this book is rooted in theoretical literature, but it is incredibly fascinating to read.
+
+Influence: The Psychology of Persuasion
+The grandfather of all persuasion books, Cialdini put his years as the world's foremost persuasion expert into this book. Impressively, this book is equally interesting to the ordinary reader as it is to persuasion experts. He distills years of research into a few critical principles that help you understand how to influence others and yourself -- and how to protect yourself from unethical persuasion.
+
+Breakthrough Advertising
+One of the most sophisticated books on advertising ever written. Virtually every master-level direct-response copywriter has read this book once, and most read it every year, only to discover new insights. Be warned: This is extremely dense copy. I don't recommend it to anyone but experienced copywriters, marketers, and psychologists. But beneath the verbiage are profound insights that have stood the test of time.
+
+X The Social Animal
+Another book by Eliot Aronson, this is a terrific primer on how our environment shapes our behavior. If the average American read this book (and had the cognitive wherewithal to believe/trust it, which is another story), they would be shocked. For all the people who say, "Ugh! Fat people should just stop eating so much!" or "I would NEVER do ___" they would be terribly troubled to learn that a sophisticated persuader -- given enough time -- can create a situation powerful enough to persuade you to do almost anything. Murder. Gaining 45lbs. Allowing yourself to be abused. Or, on the positive side, to lose weight, become healthier, improve your vocabulary, manage your money, and become friendlier.
+
+
+
+--> any nonzero CUSA retail inventory (active / inactive SKUs only) with no location set
+
+select distinct ii.sku_id, s.name from ecommerce.rsinventoryitem as ii, ecommerce.sku as s, ecommerce.item as i
+where ii.sku_id = s.sku_id
+and s.item_id = i.item_id
+and ii.quantity > 0 
+and i.vendor_id = 83
+and s.itemstatus_id IN (0, 1)
+and ii.sku_id not in (select distinct sku_id from ecommerce.sku_location);
+
+
+
+--> Modified "to-reactivate" query, removing the "with locations only" parameter. 
+
+select distinct i.item_id,its.itemstatus,pv.productversion_id,sts.itemstatus as skustatus,pv.name
+from ecommerce.item as i,ecommerce.itemstatus as its,ecommerce.itemstatus as sts,ecommerce.productversion as pv
+,ecommerce.productversionsku as pvs, ecommerce.sku as s, ecommerce.rsinventoryitem ii
+where i.item_id = pv.item_id 
+and i.vendor_id = 83
+and i.itemstatus_id in (0,1,5,8) 
+and i.itemstatus_id = its.itemstatus_id
+and pv.productversion_id = pvs.productversion_id 
+and pv.itemstatus_id in (1)
+and pvs.sku_id = s.sku_id 
+and s.itemstatus_id = sts.itemstatus_id
+and s.itemstatus_id = 0 
+and s.sku_id = ii.sku_id
+and pv.initiallaunchdate is not null
+and ii.quantity > 0 
+and pv.productversion_id not in (select pvs.productversion_id from ecommerce.productversionsku as pvs,ecommerce.sku as s where pvs.sku_id = s.sku_id and s.itemstatus_id in (1,5,8))
+order by its.itemstatus,i.item_id;
+
+
+
+--> CharityUSA SKUs with inventory, where the SKU status is Inactive or Retired. (these are sometimes FC mistakes in not reactivating the SKU, and should be turned on. If product team has marked the SKUs "retired" while they work to redo them, then reiterate to them not to do that, and move the SKUs to Partially Complete.)
+
+select i.item_id,i.name,s.sku_id,s.name,sum (rs.quantity) 
+from ecommerce.item as i, ecommerce.sku as s, ecommerce.rsinventoryitem as rs 
+where  i.vendor_id = 83 
+and i.item_id = s.item_id 
+and s.sku_id = rs.sku_id 
+and s.itemstatus_id IN (1,5) 
+group by i.item_id,i.name,s.sku_id,s.name 
+having sum (rs.quantity) > 0 
+order by s.sku_id desc;
+
+
+
+--> CharityUSA SKUs (any inventory), by location. 
+
+select loc.aisle, loc.bay, loc.shelf, loc.bin, loc.sku_location_status_id, s.sku_id, s.name, s.itemstatus_id, sum (rs.quantity) 
+from ecommerce.sku_location as loc, ecommerce.item as i, ecommerce.sku as s, ecommerce.rsinventoryitem as rs 
+where i.vendor_id = 83 
+and i.item_id = s.item_id 
+and s.sku_id = rs.sku_id 
+and loc.sku_id = s.sku_id
+group by loc.aisle, loc.bay, loc.shelf, loc.bin, loc.sku_location_status_id, s.sku_id, s.name, s.itemstatus_id
+order by loc.aisle asc;
+
+
+
+--> CharityUSA SKUs with inventory, where the SKU status is active *and* the version status is also active AND the item status is Inactive or Retired. (if you find any of these, they can almost always be turned on) 
+
+select i.item_id,i.name,pv.name,s.sku_id,s.name,sum (rs.quantity) 
+from ecommerce.item as i, ecommerce.sku as s, ecommerce.productversion as pv, ecommerce.productversionsku as pvs, ecommerce.rsinventoryitem as rs 
+where  i.vendor_id = 83 
+and i.item_id = pv.item_id
+and pv.productversion_id = pvs.productversion_id
+and pv.name not like '%COMPONENT%'
+and pvs.sku_id = s.sku_id
+and s.sku_id = rs.sku_id 
+and s.itemstatus_id = 0
+and pv.itemstatus_id = 0
+and i.itemstatus_id IN (1,5)
+group by i.item_id,i.name,pv.name,s.sku_id,s.name 
+having sum (rs.quantity) > 0 
+order by s.sku_id desc;
+
+
+
+--> Change all items with status "Complete" to status "Inactive"
+
+update ecommerce.item set itemstatus_id = 1 
+where itemstatus_id = 4
+and vendor_id = 81;
+
+
+
+
+--> CharityUSA SKUs with inventory, where the SKU status is active *and* the version status is retired AND the item status is retired. (Check through these carefully... there's a core of 50 or so old promotional SKUs that shouldn't be turned on, but sometimes a valid one gets found this way.)
+
+select pv.productversion_id,count(*) into temporary table single_sku_versions
+from ecommerce.productversion pv,ecommerce.productversionsku pvs
+where pv.productversion_id = pvs.productversion_id and pv.itemstatus_id = 5
+group by pv.productversion_id
+having count(*) = 1;
+delete from single_sku_versions as v using ecommerce.productversionsku as pvs,ecommerce.sku as s
+where v.productversion_id = pvs.productversion_id and pvs.sku_id = s.sku_id and s.itemstatus_id != 0;
+select i.item_id,i.name,pv.name from ecommerce.item as i,ecommerce.productversion as pv,single_sku_versions as s
+where i.item_id = pv.item_id and i.itemstatus_id = 5 and pv.itemstatus_id = 5 and pv.productversion_id = s.productversion_id;
+
+
+
+--> Query from Doug
+
+select i.item_id,i.name,pv.name,s.sku_id,s.name,sum (rs.quantity)
+from ecommerce.item as i, ecommerce.sku as s, ecommerce.productversion as pv, ecommerce.productversionsku as pvs, ecommerce.rsinventoryitem as rs,(select sku_id,count(*) from ecommerce.productversionsku as pvs group by sku_id having count(*) = 1) as qs
+where i.vendor_id = 83
+and i.item_id = pv.item_id
+and pv.productversion_id = pvs.productversion_id
+and pvs.sku_id = s.sku_id
+and s.sku_id = qs.sku_id
+and s.sku_id = rs.sku_id
+and s.itemstatus_id = 0
+and pv.itemstatus_id = 5
+and i.itemstatus_id IN (0, 1)
+group by i.item_id,i.name,pv.name,s.sku_id,s.name
+having sum (rs.quantity) > 0
+order by s.sku_id desc;
+
+
+
+
+--> CharityUSA SKUs of status "New" that have a non-zero retail inventory (These should be followed up with the FC to ensure they really have the quantities, and then kicked to the Product Team for launch.)
+
+select i.item_id,i.name,s.sku_id,s.name,sum (rs.quantity) 
+from ecommerce.item as i, ecommerce.sku as s, ecommerce.rsinventoryitem as rs
+where  i.vendor_id = 83 
+and i.item_id = s.item_id 
+and s.sku_id = rs.sku_id 
+and s.itemstatus_id = 2 
+and rs.inventory_item_class_id = 1
+group by i.item_id,i.name,s.sku_id,s.name 
+having sum (rs.quantity) > 0 
+order by s.sku_id desc;
+
+
+
+
+--> All active items (not Jasmere) not hooked up to any categories, screening out items with "PROMO" in the name. (Should just return the thank-you reg freebies and Extra Donation item shells)
+
+select item_id,name 
+from ecommerce.item 
+where itemstatus_id = 0 
+and item_id not in (select distinct item_Id from ecommerce.category_item)
+and vendor_id != 86
+and name not like 'PROMO%'
+order by name asc;
+
+
+
+--> All active items (not Jasmere) missing all site bitmasks (should just return the same reg thank-you and Extra Donation items)
+
+select item_id,name 
+from ecommerce.item 
+where itemstatus_id = 0 
+and site_availability_mask = 0
+and vendor_id != 86
+and name not like 'PROMO%'
+order by name asc;
+
+
+--> Any active non-PROMO CUSA items with summed quantity of 25 or more that do not have the "bulk sales" box checked?
+
+select i.item_id,i.name,sum (rs.quantity) 
+from ecommerce.item as i, ecommerce.sku as s, ecommerce.rsinventoryitem as rs 
+where i.vendor_id = 83 
+and i.item_id = s.item_id 
+and i.name not like 'PROMO%'
+and s.sku_id = rs.sku_id 
+and i.itemstatus_id = 0
+and i.itembitmask &64 != 64
+group by i.item_id,i.name 
+having sum (rs.quantity) > 24
+order by sum (rs.quantity) desc;
+
+
+
+
+--> update command to check that "bulk sales" box for the items in the query above
+
+update ecommerce.item set itembitmask = (itembitmask | 64)
+where item_id IN (
+select i.item_id from ecommerce.item as i, ecommerce.sku as s, ecommerce.rsinventoryitem as rs 
+where i.vendor_id = 83 
+and i.item_id = s.item_id 
+and i.name not like 'PROMO%'
+and i.name not like '%Sign-up Thank-You%'
+and i.name not like '%Pet Protector%'
+and s.sku_id = rs.sku_id 
+and i.itemstatus_id = 0
+and i.itembitmask &64 != 64
+group by i.item_id,i.name 
+having sum (rs.quantity) > 24);
+
+
+
+
+--> Any active non-PROMO CUSA items with summed quantity of less than 25 that have the "bulk sales" box checked?
+
+select i.item_id,i.name,sum (rs.quantity) 
+from ecommerce.item as i, ecommerce.sku as s, ecommerce.rsinventoryitem as rs 
+where i.vendor_id = 83 
+and i.item_id = s.item_id 
+and i.name not like 'PROMO%'
+and s.sku_id = rs.sku_id 
+and i.itemstatus_id = 0
+and i.itembitmask &64 = 64
+group by i.item_id,i.name 
+having sum (rs.quantity) < 25 
+order by sum (rs.quantity) asc;
+
+
+--> Allow only values 8 (int'l shipping) and 16 (GGF) -- and the sum of those is 24 -- but uncheck all other boxes on the itembitmask for CUSA non-promo items with summed qty. less than 25. 
+
+update ecommerce.item set itembitmask = (itembitmask &24)
+where item_id IN (
+select i.item_id 
+from ecommerce.item as i, ecommerce.sku as s, ecommerce.rsinventoryitem as rs 
+where i.vendor_id = 83 
+and i.item_id = s.item_id 
+and i.name not like 'PROMO%'
+and i.name not like '%Sign-up Thank-You%'
+and s.sku_id = rs.sku_id 
+and i.itemstatus_id = 0
+and i.itembitmask &64 = 64
+group by i.item_id,i.name 
+having sum (rs.quantity) < 25 
+order by sum (rs.quantity) asc );
+
+
+
+--> Any Clearance SKU that does NOT have the "not for resale" box checked
+
+select s.sku_id, s.name from ecommerce.sku as s, ecommerce.item as i, ecommerce.category_item as ci
+where s.item_id = i.item_id
+and s.itemstatus_id = 0
+and i.item_id = ci.item_id
+and s.skubitmask & 2 != 2
+and ci.category_id = 2711;
+
+
+--> Active versions that don't have "ALL SALES FINAL" in their names but that are hooked up to an item in the Clearance category. 
+
+select v.productversion_id, v.name from ecommerce.productversion as v, ecommerce.item as i, ecommerce.category_item as ci
+where v.item_id = i.item_id
+and v.itemstatus_id = 0
+and i.itemstatus_id = 0
+and i.item_id = ci.item_id
+and v.name not like '%ALL SALES FINAL%'
+and ci.category_id = 2711
+order by v.productversion_id asc;
+
+
+--> Active versions that DO have "ALL SALES FINAL" in their names, but the item is NOT hooked up to the Clearance category
+
+select distinct v.productversion_id, v.name from ecommerce.productversion as v, ecommerce.item as i, ecommerce.category_item as ci
+where v.item_id = i.item_id
+and v.itemstatus_id = 0
+and i.itemstatus_id = 0
+and i.item_id = ci.item_id
+and v.name like '%ALL SALES FINAL%'
+and v.item_id not in (select i.item_id from ecommerce.item as i, ecommerce.category_item as ci where i.item_id = ci.item_id and ci.category_id = 2711)
+order by v.productversion_id asc;
+
+
+--> Remove the string " - *ALL SALES FINAL*" from version names wherever it appears
+
+update ecommerce.productversion set name = replace (name, ' - *ALL SALES FINAL*', '');
+
+
+
+--> Any Active CUSA SKU with the "product has contraindication" box checked, and NOT the "bulk sales available" box checked? (should just be one, a K9 Advantix pet thing)
+
+select item_id,name
+from ecommerce.item
+where itemstatus_id = 0
+and vendor_id = 83
+and itembitmask &128 = 128
+and itembitmask &64 != 64;
+
+
+
+--> CharityUSA SKUs with inventory, where the SKU status is active *and* the version status is retired AND the item status is active or inactive. Huge amounts of clutter here, mostly promotional, but sometimes one is found that should be turned back on!
+
+select i.item_id,i.name,pv.name,s.sku_id,s.name,sum (rs.quantity) 
+from ecommerce.item as i, ecommerce.sku as s, ecommerce.productversion as pv, ecommerce.productversionsku as pvs, ecommerce.rsinventoryitem as rs 
+where  i.vendor_id = 83 
+and i.item_id = pv.item_id
+and pv.productversion_id = pvs.productversion_id
+and pvs.sku_id = s.sku_id
+and s.sku_id = rs.sku_id 
+and s.itemstatus_id = 0
+and pv.itemstatus_id = 5
+and i.itemstatus_id IN (0, 1)
+group by i.item_id,i.name,pv.name,s.sku_id,s.name 
+having sum (rs.quantity) > 0 
+order by s.sku_id desc;
+
+
+
+--> Stripping out all versions with either "+" or "Free" in the name... this gets rid of a huge amount of old promotional versions that were kitted together. 
+
+select i.item_id,i.name,pv.name,s.sku_id,s.name,sum (rs.quantity) 
+from ecommerce.item as i, ecommerce.sku as s, ecommerce.productversion as pv, ecommerce.productversionsku as pvs, ecommerce.rsinventoryitem as rs 
+where  i.vendor_id = 83 
+and i.item_id = pv.item_id
+and pv.productversion_id = pvs.productversion_id
+and pvs.sku_id = s.sku_id
+and s.sku_id = rs.sku_id 
+and s.itemstatus_id = 0
+and pv.itemstatus_id = 5
+and pv.name not like '%+%'
+and pv.name not like '%Free%'
+and pv.name not like '%FREE%'
+and i.itemstatus_id IN (0, 1)
+group by i.item_id,i.name,pv.name,s.sku_id,s.name 
+having sum (rs.quantity) > 0 
+order by sum asc;
+
+
+
+--> An even more scoped-down query, limiting the above to only versions with "ALL" in their names (to catch Clearance versions)
+
+select i.item_id,i.name,pv.name,s.sku_id,s.name,sum (rs.quantity) 
+from ecommerce.item as i, ecommerce.sku as s, ecommerce.productversion as pv, ecommerce.productversionsku as pvs, ecommerce.rsinventoryitem as rs 
+where  i.vendor_id = 83 
+and i.item_id = pv.item_id
+and pv.productversion_id = pvs.productversion_id
+and pvs.sku_id = s.sku_id
+and s.sku_id = rs.sku_id 
+and s.itemstatus_id = 0
+and pv.itemstatus_id = 5
+and pv.name like '%ALL%'
+and i.itemstatus_id IN (0, 1)
+group by i.item_id,i.name,pv.name,s.sku_id,s.name 
+having sum (rs.quantity) > 0 
+order by s.sku_id desc;
+
+
+
+Alizarin: C14H8O4
+
+Rubia tinctorum.
+
+Flowering plant. Helsinki bot.g. (Kump.), Finland. Planted. 1999-09-06.
+Rubia tinctorum L.
+Engl.: madder, dyer's madder, Indian madder.
+Deu.: Krapp, Färberkrapp, Färberröte.
+Suom.: värimatara, krappi.
+Sven.: krapp.
+Fran.: garance, garance de teinturiers.
+Ital.: robbia.
+Port.: garanca.
+Bot. syn.: Rubia tinctoria Salisb.
+
+aka Manjishta (?), according to http://myfolia.com/plants/1464-common-madder-rubia-tinctorum
+
+More:
+http://www.winsornewton.com/resource-centre/product-articles/rose-madder-and-alizarin
+
+http://www.henriettesherbal.com/eclectic/kings/rubia.html
+"Animals fed upon madder have their bones colored red by it."
+
+Where to buy madder extract:
+http://www.wildcolours.co.uk/html/dye_extracts.html
+
+
+C14   See fourteen 
+H 8   aitch eight: 
+O 4   oh four. 
+
+
+
+
+
+Step 1
+Go to www.linkedin.com/companyDir?industries=/
+
+Choose 10-15 industries
+
+- Computer Software
+- Computer Networking
+- Internet
+- Information Technology and Services
+- Computer and Network Security
+- Information Services
+- Libraries
+- Writing and Editing
+- Online Publishing
+- International Affairs
+- International Trade and Development
+- Publishing
+
+
+
+
+Step 2. 
+Open another window, go to home page, advanced search
+fill in title (__ OR __)
+check the boxes for industries
+click search
+
+
+surf through people, look at places they've worked. 
+
+sort by relationship
+
+click connections
+sort by zip
+optional, enter school
+
+now you have a list of people. Study their background, specifically the companies they've worked at. 
+cloud research, study the conpany
+write down companies 
+write down people's names if you'd like to contact them. 
+
+Also, you can also see the arc of people's careers as they move around. 
+
+Pull down at least 5 tier 2 companies. 5-10 would be better. Write them down, write down the job titles. 
+
+Azaleos - Collaboration Engineer (Dale Kim)
+UW
+OCLC
+
+http://www.linkedin.com/profile/view?id=3020494&authType=name&authToken=EGC8&goback=%2Enpv_4830260_*1_*1_OUT*4OF*4NETWORK_fhJW_*1_*1_*1_*1_*1_*1_*1_*1_*1_*1_*1_*1_*1_*1_*1_*1
+
+
+
+Do 30 minutes of research on each company. read at least the first 2 pages of results on Google. Add the CEO's name and "interview" and Google that too. 
+
+
+http://www.linkedin.com/jsearch?type=jobs&keywords=Functional+Project+Manager%2C+Technical+Documentation&pplSearchOrigin=GLHD&pageKey=fcs_results&search=Search
+
+http://www.linkedin.com/jsearch?type=jobs&keywords=Functional+Project+Manager%2C+Technical+Documentation&pplSearchOrigin=GLHD&pageKey=fcs_results&search=Search
+
+http://www.linkedin.com/csearch/results?facet_I=103&csrfToken=ajax%3A0936287375950426769
+
+http://www.linkedin.com/csearch/results?facet_I=4&csrfToken=ajax%3A0936287375950426769
+
+http://www.linkedin.com/csearch/results?facet_I=6&csrfToken=ajax%3A0936287375950426769
+
+http://www.linkedin.com/csearch/results?facet_I=96&csrfToken=ajax%3A0936287375950426769
+
+
+
+Program Manager - Technical Communications
+VMC (Volt MAnagement Services)
+http://www.linkedin.com/profile/view?id=4717659&authType=OUT_OF_NETWORK&authToken=sBc4&locale=en_US&srchid=afeac1d6-091a-44a4-9397-4d5166a5bbe7-1&srchindex=2&srchtotal=17&goback=.fps_PBCK_*1_*2_*2_*2_Intranet+Manager_CP_*2_*2_*1_I_us_*2_*1_false_1_R_*1_*51_*1_*51_true_CC%2CN%2CI%2CPC%2CED%2CL%2CFG%2CTE%2CFA%2CSE%2CP%2CCS%2CF%2CDR%2CG_*2_*2_*2_*2_*2_1235_*2_*2_*2_*2_*2_*2_*2_*2_*2_*2_*2_*2_*2_*2&pvs=ps&trk=pp_profile_name_link
+
+
+
+
+
+
+LANDED COST QUERIES
+
+
+--> Landed cost of Wholesale and Retail CUSA inventory, split out by class.
+
+select cost.inventory_item_class,cost.cost_calculation as calculation_type,sum(cost.basis)::numeric(15,2) as base_cost,sum(cost.inventory_landed_cost)::numeric(15,2) as inventory_landed_cost from (select iic.inventory_item_class,'Landed Cost' as cost_calculation,sum(ii.quantity * ii.merchantprice) as basis,sum(ii.quantity * (poli.unitprice + ((COALESCE(s.freight_cost,0.00) + COALESCE(s.freight_forward_invoice_amount,0.00) + COALESCE(s.exam_fee,0.00)) / shipment_quantity) + (COALESCE(sli.fees,0.00) / sli.quantity) + (COALESCE(poli.flatRateSurcharge,0.00) / cast(poli.quantityordered as float)) + (COALESCE(sli.duty_percent,0.00) *.01 * poli.unitprice) + COALESCE(poli.unitSurcharge,0.00))) as inventory_landed_cost from ecommerce.rsinventoryitem ii, ecommerce.inventory_item_class as iic,ecommerce.sku sku, ecommerce.receivingevent re, ecommerce.purchaseorderlineitem poli, ecommerce.inbound_shipment_line_item sli, ecommerce.inbound_shipment s, ecommerce.item i,(select sli.inbound_shipment_id as shipment_id,sum(sli.quantity) as shipment_quantity from ecommerce.inbound_shipment_line_item sli group by inbound_shipment_id ) as tsq where re.polineitem_id = poli.polineitem_id and sli.po_line_item_id = poli.polineitem_id and sli.inbound_shipment_id = s.inbound_shipment_id and sku.sku_id = ii.sku_id and ii.receivingevent_id = re.receivingevent_id and sku.item_id = i.item_id and s.inbound_shipment_id = tsq.shipment_id and iic.inventory_item_class_id = ii.inventory_item_class_id and poli.quantityordered > 0 and sli.quantity > 0 and tsq.shipment_quantity > 0 and i.vendor_id = 83 group by iic.inventory_item_class  UNION select iic.inventory_item_class,'PO Cost Data' as cost_calculation,sum(ii.quantity * ii.merchantprice) as basis,sum(ii.quantity * (poli.unitprice + (COALESCE(poli.flatRateSurcharge,0.00) / cast(poli.quantityordered as float)) + COALESCE(poli.unitSurcharge,0.00))) as inventory_landed_cost from ecommerce.rsinventoryitem ii,ecommerce.inventory_item_class as iic, ecommerce.sku sku, ecommerce.receivingevent re, ecommerce.purchaseorderlineitem poli, ecommerce.item i where re.polineitem_id = poli.polineitem_id and sku.sku_id = ii.sku_id and iic.inventory_item_class_id = ii.inventory_item_class_id and ii.receivingevent_id = re.receivingevent_id and sku.item_id = i.item_id and i.vendor_id = 83 and poli.quantityordered > 0 and poli.polineitem_id not in (select distinct po_line_item_id from ecommerce.inbound_shipment_line_item) group by iic.inventory_item_class  UNION select iic.inventory_item_class,'Merchant Price' as cost_calculation,sum(ii.quantity * ii.merchantprice) as basis,sum(ii.quantity * ii.merchantprice) as inventory_landed_cost from ecommerce.rsinventoryitem ii,ecommerce.inventory_item_class as iic, ecommerce.sku sku, ecommerce.item i where sku.sku_id = ii.sku_id and iic.inventory_item_class_id = ii.inventory_item_class_id and ii.receivingevent_id is null and sku.item_id = i.item_id and i.vendor_id = 83 group by iic.inventory_item_class ) as cost group by cost.inventory_item_class,cost.cost_calculation order by cost.inventory_item_class,cost.cost_calculation
+
+
+
+
+
+--> huge discrepancies
+
+select ii.oid as InventoryId,s.sku_id as SkuID,s.name as SkuName,ii.quantity as InventoryQuantity,ii.merchantprice::numeric(10,2) as merchantPrice,(ii.quantity * ii.merchantprice)::numeric(10,2) as base_cost,case when ii.quantity > 0 then (ii.quantity * cost.inventory_landed_cost)::numeric(20,2) else 0.00 end as InventoryValue,case when ii.quantity * ii.merchantprice > 0.00 then ((ii.quantity * cost.inventory_landed_cost)/(ii.quantity * ii.merchantprice))::numeric(20,2) else 0.00 end as value_cost_ratio From ecommerce.rsinventoryitem as ii,ecommerce.inventory_item_type as iit,ecommerce.sku as s,ecommerce.item as i,ecommerce.skucategory as sc, (select t.oid,sum(t.inventory_landed_cost) as inventory_landed_cost from ( select ii.oid,poli.unitprice + ((COALESCE(s.freight_cost,0.00) + COALESCE(s.freight_forward_invoice_amount,0.00) + COALESCE(s.exam_fee,0.00)) / shipment_quantity) + (COALESCE(sli.fees,0.00) / sli.quantity) + (COALESCE(poli.flatRateSurcharge,0.00) / cast(poli.quantityordered as float)) + (COALESCE(sli.duty_percent,0.00) *.01 * poli.unitprice) + COALESCE(poli.unitSurcharge,0.00) as inventory_landed_cost from ecommerce.rsinventoryitem ii, ecommerce.inventory_item_class as iic,ecommerce.sku sku, ecommerce.receivingevent re, ecommerce.purchaseorderlineitem poli, ecommerce.inbound_shipment_line_item sli, ecommerce.inbound_shipment s, ecommerce.item i,(select sli.inbound_shipment_id as shipment_id,sum(sli.quantity) as shipment_quantity from ecommerce.inbound_shipment_line_item sli group by inbound_shipment_id ) as tsq where re.polineitem_id = poli.polineitem_id and sli.po_line_item_id = poli.polineitem_id and sli.inbound_shipment_id = s.inbound_shipment_id and sku.sku_id = ii.sku_id and ii.receivingevent_id = re.receivingevent_id and sku.item_id = i.item_id and s.inbound_shipment_id = tsq.shipment_id and iic.inventory_item_class_id = ii.inventory_item_class_id and poli.quantityordered > 0 and sli.quantity > 0 and tsq.shipment_quantity > 0 and i.vendor_id = 83  UNION select ii.oid,(poli.unitprice + (COALESCE(poli.flatRateSurcharge,0.00) / cast(poli.quantityordered as float)) + COALESCE(poli.unitSurcharge,0.00)) as inventory_landed_cost from ecommerce.rsinventoryitem ii,ecommerce.inventory_item_class as iic, ecommerce.sku sku, ecommerce.receivingevent re, ecommerce.purchaseorderlineitem poli, ecommerce.item i where re.polineitem_id = poli.polineitem_id and sku.sku_id = ii.sku_id and iic.inventory_item_class_id = ii.inventory_item_class_id and ii.receivingevent_id = re.receivingevent_id and sku.item_id = i.item_id and i.vendor_id = 83 and poli.quantityordered > 0 and poli.polineitem_id not in (select distinct po_line_item_id from ecommerce.inbound_shipment_line_item)  UNION select ii.oid,ii.merchantprice as inventory_landed_cost from ecommerce.rsinventoryitem ii,ecommerce.inventory_item_class as iic, ecommerce.sku sku, ecommerce.item i where sku.sku_id = ii.sku_id and iic.inventory_item_class_id = ii.inventory_item_class_id and ii.receivingevent_id is null and sku.item_id = i.item_id and i.vendor_id = 83 ) as t group by t.oid) as cost where i.vendor_id = 83 and ii.inventory_item_type_id = iit.inventory_item_type_id and i.item_id = s.item_id and s.sku_id = ii.sku_id and s.sku_id = sc.sku_id and ii.oid = cost.oid and s.sku_id not in (select s.sku_id from ecommerce.sku as s,ecommerce.rsinventoryitem as ii where s.sku_id = ii.sku_id and s.itemstatus_id = 5 group by s.sku_id having sum(ii.quantity) = 0) order by value_cost_ratio desc; 
+
+
+
+
+
+--> Inventory query sorted by discrepancy
+
+select ii.oid as InventoryId,s.sku_id as SkuID,s.name as SkuName,ii.quantity as InventoryQuantity,ii.merchantprice::numeric(10,2) as merchantPrice,(ii.quantity * ii.merchantprice)::numeric(10,2) as base_cost,case when ii.quantity > 0 then (ii.quantity * cost.inventory_landed_cost)::numeric(20,2) else 0.00 end as InventoryValue,case when ii.quantity * ii.merchantprice > 0.00 then ((ii.quantity * cost.inventory_landed_cost)/(ii.quantity * ii.merchantprice))::numeric(20,2) else 0.00 end as value_cost_ratio From ecommerce.rsinventoryitem as ii,ecommerce.inventory_item_type as iit,ecommerce.sku as s,ecommerce.item as i,ecommerce.skucategory as sc, (select t.oid,sum(t.inventory_landed_cost) as inventory_landed_cost from ( select ii.oid,poli.unitprice + ((COALESCE(s.freight_cost,0.00) + COALESCE(s.freight_forward_invoice_amount,0.00) + COALESCE(s.exam_fee,0.00)) / shipment_quantity) + (COALESCE(sli.fees,0.00) / sli.quantity) + (COALESCE(poli.flatRateSurcharge,0.00) / cast(poli.quantityordered as float)) + (COALESCE(sli.duty_percent,0.00) *.01 * poli.unitprice) +  COALESCE(poli.unitSurcharge,0.00) as inventory_landed_cost from ecommerce.rsinventoryitem ii, ecommerce.inventory_item_class as iic,ecommerce.sku sku, ecommerce.receivingevent re, ecommerce.purchaseorderlineitem poli, ecommerce.inbound_shipment_line_item sli, ecommerce.inbound_shipment s, ecommerce.item i,(select sli.inbound_shipment_id as shipment_id,sum(sli.quantity) as shipment_quantity from ecommerce.inbound_shipment_line_item sli group by inbound_shipment_id ) as tsq where re.polineitem_id = poli.polineitem_id and sli.po_line_item_id = poli.polineitem_id and sli.inbound_shipment_id = s.inbound_shipment_id and sku.sku_id = ii.sku_id and ii.receivingevent_id = re.receivingevent_id and sku.item_id = i.item_id and s.inbound_shipment_id = tsq.shipment_id and iic.inventory_item_class_id = ii.inventory_item_class_id and poli.quantityordered > 0 and sli.quantity > 0 and tsq.shipment_quantity > 0 and i.vendor_id = 83  UNION select ii.oid,(poli.unitprice + (COALESCE(poli.flatRateSurcharge,0.00) / cast(poli.quantityordered as float)) +  COALESCE(poli.unitSurcharge,0.00)) as inventory_landed_cost from ecommerce.rsinventoryitem ii,ecommerce.inventory_item_class as iic, ecommerce.sku sku, ecommerce.receivingevent re, ecommerce.purchaseorderlineitem poli, ecommerce.item i where re.polineitem_id = poli.polineitem_id and sku.sku_id = ii.sku_id and iic.inventory_item_class_id = ii.inventory_item_class_id and ii.receivingevent_id = re.receivingevent_id and sku.item_id = i.item_id and i.vendor_id = 83 and poli.quantityordered > 0 and poli.polineitem_id not in (select distinct po_line_item_id from ecommerce.inbound_shipment_line_item)  UNION select ii.oid,ii.merchantprice as inventory_landed_cost from ecommerce.rsinventoryitem ii,ecommerce.inventory_item_class as iic, ecommerce.sku sku, ecommerce.item i where sku.sku_id = ii.sku_id and iic.inventory_item_class_id = ii.inventory_item_class_id and ii.receivingevent_id is null and sku.item_id = i.item_id and i.vendor_id = 83 ) as t group by t.oid) as cost where coalesce(ii.aisle,0) > 0 and i.vendor_id = 83 and ii.inventory_item_type_id = iit.inventory_item_type_id and i.item_id = s.item_id and s.sku_id = ii.sku_id and s.sku_id = sc.sku_id and ii.oid = cost.oid   and s.sku_id not in (select s.sku_id from ecommerce.sku as s,ecommerce.rsinventoryitem as ii where s.sku_id = ii.sku_id and s.itemstatus_id = 5 group by s.sku_id having sum(ii.quantity) = 0) order by value_cost_ratio desc; 
+
+
+
+--> Inventory query for auditors
+
+select ii.oid as InventoryId,ii.aisle as InventoryAisle,ii.bay as InventoryBay,ii.shelf as InventoryShelf,ii.bin as InventoryBin,ii.quantity as InventoryQuantity,iit.inventory_item_type as InventoryType,i.item_id as ItemId,i.name as ItemName,s.sku_Id as SkuID,s.name as SkuName,sc.skucategory1 as Category1,ii.merchantprice as Cost,case when ii.quantity > 0 then (cost.inventory_landed_cost)::numeric(20,2) else 0.00 end as InventoryValue From ecommerce.rsinventoryitem as ii,ecommerce.inventory_item_type as iit,ecommerce.sku as s,ecommerce.item as i,ecommerce.skucategory as sc, (select t.oid,sum(t.inventory_landed_cost) as inventory_landed_cost from ( select ii.oid,poli.unitprice + ((COALESCE(s.freight_cost,0.00) + COALESCE(s.freight_forward_invoice_amount,0.00) + COALESCE(s.exam_fee,0.00)) / shipment_quantity) + (COALESCE(sli.fees,0.00) / sli.quantity) + (COALESCE(poli.flatRateSurcharge,0.00) / cast(poli.quantityordered as float)) + (COALESCE(sli.duty_percent,0.00) *.01 * poli.unitprice) +  COALESCE(poli.unitSurcharge,0.00) as inventory_landed_cost from ecommerce.rsinventoryitem ii, ecommerce.inventory_item_class as iic,ecommerce.sku sku, ecommerce.receivingevent re, ecommerce.purchaseorderlineitem poli, ecommerce.inbound_shipment_line_item sli, ecommerce.inbound_shipment s, ecommerce.item i,(select sli.inbound_shipment_id as shipment_id,sum(sli.quantity) as shipment_quantity from ecommerce.inbound_shipment_line_item sli group by inbound_shipment_id ) as tsq where re.polineitem_id = poli.polineitem_id and sli.po_line_item_id = poli.polineitem_id and sli.inbound_shipment_id = s.inbound_shipment_id and sku.sku_id = ii.sku_id and ii.receivingevent_id = re.receivingevent_id and sku.item_id = i.item_id and s.inbound_shipment_id = tsq.shipment_id and iic.inventory_item_class_id = ii.inventory_item_class_id and poli.quantityordered > 0 and sli.quantity > 0 and tsq.shipment_quantity > 0 and i.vendor_id = 83  UNION select ii.oid,ii.quantity * (poli.unitprice + (COALESCE(poli.flatRateSurcharge,0.00) / cast(poli.quantityordered as float)) +  COALESCE(poli.unitSurcharge,0.00)) as inventory_landed_cost from ecommerce.rsinventoryitem ii,ecommerce.inventory_item_class as iic, ecommerce.sku sku, ecommerce.receivingevent re, ecommerce.purchaseorderlineitem poli, ecommerce.item i where re.polineitem_id = poli.polineitem_id and sku.sku_id = ii.sku_id and iic.inventory_item_class_id = ii.inventory_item_class_id and ii.receivingevent_id = re.receivingevent_id and sku.item_id = i.item_id and i.vendor_id = 83 and poli.quantityordered > 0 and poli.polineitem_id not in (select distinct po_line_item_id from ecommerce.inbound_shipment_line_item)  UNION select ii.oid,ii.quantity * ii.merchantprice as inventory_landed_cost from ecommerce.rsinventoryitem ii,ecommerce.inventory_item_class as iic, ecommerce.sku sku, ecommerce.item i where sku.sku_id = ii.sku_id and iic.inventory_item_class_id = ii.inventory_item_class_id and ii.receivingevent_id is null and sku.item_id = i.item_id and i.vendor_id = 83 ) as t group by t.oid) as cost where coalesce(ii.aisle,0) > 0 and i.vendor_id = 83 and ii.inventory_item_type_id = iit.inventory_item_type_id and i.item_id = s.item_id and s.sku_id = ii.sku_id and s.sku_id = sc.sku_id and ii.oid = cost.oid order by cost desc
+
+
+--> Inventory query for auditors, stripping out retired-at-zero records
+
+select ii.oid as InventoryId,ii.aisle as InventoryAisle,ii.bay as InventoryBay,ii.shelf as InventoryShelf,ii.bin as InventoryBin,ii.quantity as InventoryQuantity,iit.inventory_item_type as InventoryType,i.item_id as ItemId,i.name as ItemName,s.sku_Id as SkuID,s.name as SkuName,sc.skucategory1 as Category1,ii.merchantprice::numeric(10,2) as Cost,case when ii.quantity > 0 then (ii.quantity * cost.inventory_landed_cost)::numeric(20,2) else 0.00 end as InventoryValue From ecommerce.rsinventoryitem as ii,ecommerce.inventory_item_type as iit,ecommerce.sku as s,ecommerce.item as i,ecommerce.skucategory as sc, (select t.oid,sum(t.inventory_landed_cost) as inventory_landed_cost from ( select ii.oid,poli.unitprice + ((COALESCE(s.freight_cost,0.00) + COALESCE(s.freight_forward_invoice_amount,0.00) + COALESCE(s.exam_fee,0.00)) / shipment_quantity) + (COALESCE(sli.fees,0.00) / sli.quantity) + (COALESCE(poli.flatRateSurcharge,0.00) / cast(poli.quantityordered as float)) + (COALESCE(sli.duty_percent,0.00) *.01 * poli.unitprice) + COALESCE(poli.unitSurcharge,0.00) as inventory_landed_cost from ecommerce.rsinventoryitem ii, ecommerce.inventory_item_class as iic,ecommerce.sku sku, ecommerce.receivingevent re, ecommerce.purchaseorderlineitem poli, ecommerce.inbound_shipment_line_item sli, ecommerce.inbound_shipment s, ecommerce.item i,(select sli.inbound_shipment_id as shipment_id,sum(sli.quantity) as shipment_quantity from ecommerce.inbound_shipment_line_item sli group by inbound_shipment_id ) as tsq where re.polineitem_id = poli.polineitem_id and sli.po_line_item_id = poli.polineitem_id and sli.inbound_shipment_id = s.inbound_shipment_id and sku.sku_id = ii.sku_id and ii.receivingevent_id = re.receivingevent_id and sku.item_id = i.item_id and s.inbound_shipment_id = tsq.shipment_id and iic.inventory_item_class_id = ii.inventory_item_class_id and poli.quantityordered > 0 and sli.quantity > 0 and tsq.shipment_quantity > 0 and i.vendor_id = 83  UNION select ii.oid,(poli.unitprice + (COALESCE(poli.flatRateSurcharge,0.00) / cast(poli.quantityordered as float)) + COALESCE(poli.unitSurcharge,0.00)) as inventory_landed_cost from ecommerce.rsinventoryitem ii,ecommerce.inventory_item_class as iic, ecommerce.sku sku, ecommerce.receivingevent re, ecommerce.purchaseorderlineitem poli, ecommerce.item i where re.polineitem_id = poli.polineitem_id and sku.sku_id = ii.sku_id and iic.inventory_item_class_id = ii.inventory_item_class_id and ii.receivingevent_id = re.receivingevent_id and sku.item_id = i.item_id and i.vendor_id = 83 and poli.quantityordered > 0 and poli.polineitem_id not in (select distinct po_line_item_id from ecommerce.inbound_shipment_line_item)  UNION select ii.oid,ii.merchantprice as inventory_landed_cost from ecommerce.rsinventoryitem ii,ecommerce.inventory_item_class as iic, ecommerce.sku sku, ecommerce.item i where sku.sku_id = ii.sku_id and iic.inventory_item_class_id = ii.inventory_item_class_id and ii.receivingevent_id is null and sku.item_id = i.item_id and i.vendor_id = 83 ) as t group by t.oid) as cost where coalesce(ii.aisle,0) > 0 and i.vendor_id = 83 and ii.inventory_item_type_id = iit.inventory_item_type_id and i.item_id = s.item_id and s.sku_id = ii.sku_id and s.sku_id = sc.sku_id and ii.oid = cost.oid and s.sku_id not in (select s.sku_id from ecommerce.sku as s,ecommerce.rsinventoryitem as ii where s.sku_id = ii.sku_id and s.itemstatus_id = 5 group by s.sku_id having sum(ii.quantity) = 0) order by InventoryValue desc; 
+
+
+
+--> Base cost of Wholesale and Retail CUSA inventory, split out by class. 
+
+select iic.inventory_item_class, sum(ii.quantity * ii.merchantPrice) 
+from ecommerce.inventory_item_class as iic,ecommerce.rsinventoryitem as ii,ecommerce.sku as s,ecommerce.item as i 
+where iic.inventory_item_class_id = ii.inventory_item_class_id 
+and ii.sku_id = s.sku_id 
+and s.item_id = i.item_id 
+and i.vendor_id = 83 
+group by iic.inventory_item_class; 
+
+
+
+--> Landed cost by SKU inventory
+
+select now()::DATE AS inventory_date,s.name AS sku_name,COALESCE(s.partNumber,'None') AS part_number,wi.current_inventory AS current_inventory,wi.weighted_price::numeric(12,4) AS weighted_wholesale_price,wi.inventory_value::numeric(12,4) AS inventory_value,CASE WHEN wi.current_inventory > 0 THEN t.inventory_landed_cost::numeric(12,4) ELSE 0.00 END as landed_cost,sup.supplierName AS supplier_name
+from ecommerce.SKU s,ecommerce.Supplier sup,( select i.supplier_id,i.sku_id,sum(i.current_inventory) AS current_inventory,CASE WHEN sum(i.current_inventory) = 0 THEN 0 ELSE sum(i.merchant_price * i.current_inventory) / sum(i.current_inventory) END AS weighted_price,sum(i.merchant_price * i.current_inventory) AS inventory_value
+from ( select ii.supplier_id,s.sku_id,COALESCE(ii.merchantPrice,0.00) AS merchant_price,sum(COALESCE(ii.quantity,0)) AS current_inventory
+from ecommerce.rsinventoryitem ii,ecommerce.sku s
+where ii.sku_id = s.sku_id and s.skuBitMask & 1 = 1 and ii.inventory_item_class_id = 1 and s.itemStatus_id = 0 and ii.supplier_id != 158
+group by ii.supplier_id,s.sku_id,COALESCE(ii.merchantPrice,0.00)
+ ) as i
+group by i.supplier_id,i.sku_id
+ ) as wi,( select t.sku_id,t.supplier_id,sum(t.inventory_landed_cost) as inventory_landed_cost
+from (select ii.oid,ii.sku_id,ii.supplier_id,ii.quantity * (poli.unitprice + ((COALESCE(s.freight_cost,0.00) + COALESCE(s.freight_forward_invoice_amount,0.00) + COALESCE(s.exam_fee,0.00)) / shipment_quantity) + (COALESCE(sli.fees,0.00) / sli.quantity) + (COALESCE(po.flat_rate_surcharge,0.00) / cast(COALESCE(tpoq.po_quantity,0) as float)) + (COALESCE(poli.flatRateSurcharge,0.00) / cast(poli.quantityordered as float)) + (COALESCE(sli.duty_percent,0.00) *.01 * poli.unitprice) +  COALESCE(poli.unitSurcharge,0.00)) as inventory_landed_cost from ecommerce.rsinventoryitem ii, ecommerce.sku sku, ecommerce.receivingevent re, ecommerce.purchaseorder po, ecommerce.purchaseorderlineitem poli, ecommerce.inbound_shipment_line_item sli, ecommerce.inbound_shipment s, ecommerce.item i,(select sli.inbound_shipment_id as shipment_id,sum(sli.quantity) as shipment_quantity from ecommerce.inbound_shipment_line_item sli group by inbound_shipment_id ) as tsq, (select pol.purchaseorder_id as po_id, sum(pol.quantityordered) as po_quantity from ecommerce.purchaseorderlineitem pol group by pol.purchaseorder_id) as tpoq where re.polineitem_id = poli.polineitem_id and po.purchaseorder_id = poli.purchaseorder_id and tpoq.po_id = po.purchaseorder_id and sli.po_line_item_id = poli.polineitem_id and sli.inbound_shipment_id = s.inbound_shipment_id and sku.sku_id = ii.sku_id and ii.receivingevent_id = re.receivingevent_id and sku.item_id = i.item_id and s.inbound_shipment_id = tsq.shipment_id and ii.inventory_item_class_id = 1 and poli.quantityordered > 0 and sli.quantity > 0 and tsq.shipment_quantity > 0 and i.vendor_id = 83 UNION select ii.oid,ii.sku_id,ii.supplier_id,ii.quantity * (poli.unitprice + (COALESCE(po.flat_rate_surcharge,0.00) / cast(COALESCE(tpoq.po_quantity,0) as float)) + (COALESCE(poli.flatRateSurcharge,0.00) / cast(poli.quantityordered as float)) +  COALESCE(poli.unitSurcharge,0.00)) as inventory_landed_cost from ecommerce.rsinventoryitem ii, ecommerce.sku sku, ecommerce.receivingevent re, ecommerce.purchaseorder po, ecommerce.purchaseorderlineitem poli, ecommerce.item i, (select pol.purchaseorder_id as po_id, sum(pol.quantityordered) as po_quantity from ecommerce.purchaseorderlineitem pol group by pol.purchaseorder_id) as tpoq where re.polineitem_id = poli.polineitem_id and po.purchaseorder_id = poli.purchaseorder_id and tpoq.po_id = po.purchaseorder_id and sku.sku_id = ii.sku_id and ii.inventory_item_class_id = 1 and ii.receivingevent_id = re.receivingevent_id and sku.item_id = i.item_id and i.vendor_id = 83 and poli.quantityordered > 0 and poli.polineitem_id not in (select distinct po_line_item_id from ecommerce.inbound_shipment_line_item) UNION select ii.oid,ii.sku_id,ii.supplier_id,ii.quantity * ii.merchantprice as inventory_landed_cost from ecommerce.rsinventoryitem ii, ecommerce.sku sku, ecommerce.item i where sku.sku_id = ii.sku_id and ii.inventory_item_class_id = 1 and ii.receivingevent_id is null and sku.item_id = i.item_id and i.vendor_id = 83 ) as t
+group by t.sku_id,t.supplier_id
+ ) as t
+where s.itemStatus_id = 0 and s.sku_id = wi.sku_id and wi.supplier_id = sup.supplier_id and wi.sku_id = t.sku_id and wi.supplier_id = t.supplier_id
+order by s.name
+
+
+
+
+--> CUSA inventory records with quantity but without any receiving events
+
+select iic.inventory_item_class,sum(ii.quantity * ii.merchantprice) as inventory_landed_cost from ecommerce.rsinventoryitem ii,ecommerce.inventory_item_class as iic, ecommerce.sku sku, ecommerce.item i where sku.sku_id = ii.sku_id and iic.inventory_item_class_id = ii.inventory_item_class_id and ii.receivingevent_id is null and sku.item_id = i.item_id and i.vendor_id = 83 group by iic.inventory_item_class 
+
+
+
+--> Show nonzero CUSA inventory records without receiving events
+
+select sku.sku_id, sum(ii.quantity * ii.merchantprice) 
+as inventory_landed_cost 
+from ecommerce.rsinventoryitem as ii, ecommerce.sku as sku, ecommerce.item as i 
+where sku.sku_id = ii.sku_id 
+and ii.quantity > 0 
+and ii.receivingevent_id is null 
+and sku.item_id = i.item_id 
+and i.vendor_id = 83
+group by sku.sku_id;
+
+
+
+
+--> Brad's duty discrepancy tool
+
+select ibs.inbound_shipment_id as shipment_id, COALESCE(ibs.duty_invoice_amount,0.00) + COALESCE(ibs.additional_duty_amount) as shipment_duty_amount, sli_tmp.sli_duty as line_item_duty_amount
+from ecommerce.inbound_shipment ibs, ecommerce.inbound_shipment_line_item sli, ecommerce.purchaseorderlineitem poli,
+(select sli.inbound_shipment_id as shipment_id, sum(COALESCE(sli.duty_percent,0.00) *.01 * COALESCE(poli.unitprice) * poli.quantityordered) as sli_duty from ecommerce.inbound_shipment_line_item sli, ecommerce.purchaseorderlineitem poli
+where sli.po_line_item_id = poli.polineitem_id 
+group by sli.inbound_shipment_id) 
+as sli_tmp
+where ibs.inbound_shipment_id = sli.inbound_shipment_id 
+and poli.polineitem_id = sli.po_line_item_id 
+and ibs.inbound_shipment_id = sli_tmp.shipment_id
+group by ibs.inbound_shipment_id, COALESCE(ibs.duty_invoice_amount,0.00) + COALESCE(ibs.additional_duty_amount), sli_tmp.sli_duty
+order by shipment_id
+
+
+--> Show base costs of all nonzero CUSA inventory records that have shipments
+
+
+
+REFERENCE / NOT MUCH NEED TO CHECK ON THESE TOO OFTEN
+
+--> Active CUSA SKUs at 0 qty. 
+
+select sku.sku_id, sum (quantity) from
+(select s.sku_id, s.itemstatus_id, sum (rs.quantity) as quantity from ecommerce.sku as s, ecommerce.rsinventoryitem as rs,
+ecommerce.item as i
+where s.sku_id = rs.sku_id
+and s.item_id = i.item_id
+and i.vendor_id = 83
+group by s.sku_id, s.itemstatus_id) as sku
+where sku.itemstatus_id = 0
+group by sku.sku_id, sku.itemstatus_id
+having sum (quantity) = 0;
+
+
+
+
+--> 0-qty. POLIs
+
+select purchaseorder_id from ecommerce.purchaseorderlineitem where quantityordered = 0;
+
+
+
+
+
+--> 0-qty. SLIs
+
+select inbound_shipment_id from ecommerce.inbound_shipment_line_item where quantity = 0;
+
+
+
+
+
+
+
+--> What artisan records were modified today? 
+
+select count(*) from ecommerce.artisan where datelastmodified >= now()::DATE; 
+
+
+
+--> List of any versions that ought to have a Chimera e-mail (vendors 37 and 77), but don't. 
+
+select pv.productversion_id, pv.name from chimera.content as cc, ecommerce.productversion as pv, ecommerce.item as i
+where i.item_id = pv.item_id
+and i.vendor_id IN (37, 77)
+and pv.productversion_id not in (select cc.source_id from chimera.content as cc, panacea.source_class as psc, ecommerce.productversion as 
+pv where pv.productversion_id = cc.source_id
+and cc.source_class_id = psc.source_class_id
+and psc.source_class_id = 10)
+and pv.itemstatus_id IN (0, 1)
+group by pv.productversion_id, pv.name;
+
+
+--> Anything "matched" to item 31308
+
+select i2.item_id, i2.name, i2.itemstatus_id, mi.child_item_id, i.name from ecommerce.item as i, ecommerce.matching_item as mi, ecommerce.item as i2 
+where mi.parent_item_id = i2.item_id
+and i.item_id = mi.child_item_id
+and i.item_id = 31308;
+
+
+
+--> What active items are missing a 100 image field? 
+
+select item_id,name
+from ecommerce.item
+where itemstatus_id = 0
+and item_Id not in 
+   (select pi.item_id 
+   from ecommerce.ggproductimage as pi 
+   where item_id = pi.item_id)
+
+
+--> What active items are missing a 200 image field? 
+
+select item_id,name
+from ecommerce.item
+where itemstatus_id = 0
+and item_Id not in
+  (select pi.item_id
+  from ecommerce.ggproductimage as pi
+  where item_id = pi.item_id
+  and keyName = 'image_200')
+
+
+
+--> Are there any active versions of active CUSA items that do NOT have expedited shipping? (Got the Product Team to fix up the data. Now there should be only 116 or so of these. Updated list of versions that can't go expedited is kept in the co. wiki here: http://fang.greatergood.net/wiki/index.php/Versions_That_Can%27t_Go_Expedited_Shipping)
+
+select i.item_id,i.name,pv.productversion_id, pv.name
+from ecommerce.item as i,ecommerce.productversion as pv
+where  i.vendor_id = 83
+and i.itemstatus_id = 0 
+and i.item_id = pv.item_id
+and pv.shippingoptionbitmask | 1 != 15
+and pv.itemstatus_id = 0
+order by pv.name asc;
+
+
+
+
+
+--> All Active items, with one (or more) SKUs with country of origin = US, distinct item IDs only, in numerical order. 
+
+select distinct i.item_id,i.name
+from ecommerce.vendor as v, ecommerce.item as i, ecommerce.productversion as pv, ecommerce.itemstatus as ip, ecommerce.sku as s, ecommerce.productversionsku as pvs
+where v.name like 'Charity%' 
+and i.itemstatus_id = 0 
+and i.item_id = pv.item_id 
+and pv.itemstatus_id = ip.itemstatus_id 
+and pv.productversion_id = pvs.productversion_id 
+and pvs.sku_id = s.sku_id 
+and s.isocountrycodeoforigin = 'US' 
+and s.itemstatus_id = 0
+order by i.item_id;
+
+
+
+
+--> Are there any Novica items that can go international? 
+
+select item_id,name 
+from ecommerce.item 
+where itemstatus_id = 0 
+and vendor_id = 81
+and itembitmask &8 = 8
+order by name asc;
+
+
+
+--> Find out what Novica product ID XXX corresponds to in our system
+
+select source_id from ecommerce.novica_identity
+where novica_id = 124701
+and sourceclass_id = 1;
+
+
+
+
+--> All active PROMO items that have the "bulk sales available" box checked
+
+select item_id,name
+from ecommerce.item
+where itemstatus_id = 0
+and name like 'PROMO%'
+and itembitmask &64 = 64;
+
+
+
+--> All active PROMO items that do not have the "not for resale" box checked
+
+select item_id,name
+from ecommerce.item
+where itemstatus_id = 0
+and name like 'PROMO%'
+and itembitmask &256 != 256;
+
+
+
+--> Are there any Peace Coffee items with expedited shipping enabled? 
+
+select i.item_id,i.name,pv.name
+from ecommerce.item as i,ecommerce.productversion as pv
+where  i.vendor_id = 34
+and i.itemstatus_id = 0 
+and i.item_id = pv.item_id
+and pv.shippingoptionbitmask | 1 != 1;
+
+
+
+--> Are there any OWP items with expedited shipping? 
+
+select i.item_id,i.name,pv.name
+from ecommerce.item as i,ecommerce.productversion as pv
+where  i.vendor_id = 60
+and i.itemstatus_id = 0 
+and i.item_id = pv.item_id
+and pv.shippingoptionbitmask | 1 != 1;
+
+
+
+--> Are there any MediVet items with expedited shipping? 
+
+select i.item_id,i.name,pv.name
+from ecommerce.item as i,ecommerce.productversion as pv
+where  i.vendor_id = 82
+and i.itemstatus_id = 0 
+and i.item_id = pv.item_id
+and pv.shippingoptionbitmask | 1 != 1;
+
+
+--> Are there any active NON-CUSA, NON-GGO, NON-gift basket, NON-Koch items with expedited shipping? 
+
+select i.item_id,i.name,pv.name
+from ecommerce.item as i,ecommerce.productversion as pv
+where  i.vendor_id != 77
+and i.vendor_id != 83
+and i.vendor_id != 37
+and i.vendor_id != 87
+and i.vendor_id != 64
+and i.itemstatus_id = 0 
+and i.item_id = pv.item_id
+and pv.shippingoptionbitmask | 1 != 1;
+
+
+
+--> Are there any GTGM that do NOT have expedited shipping? 
+
+select i.item_id,i.name,pv.name
+from ecommerce.item as i,ecommerce.productversion as pv
+where  i.vendor_id = 77
+and i.itemstatus_id = 0 
+and i.item_id = pv.item_id
+and pv.shippingoptionbitmask | 1 != 15;
+
+
+
+--> Are there any GTGM versions that do not have a tax deductible version price? (change the second date to be in the future when you search)
+
+select pv.productversion_id 
+from ecommerce.item i,ecommerce.productversion pv 
+where i.item_id = pv.item_id 
+and i.itembitmask & 32 = 32 
+and i.itemstatus_id = 0
+and pv.itemstatus_id = 0
+and pv.productversion_id not in (select source_Id from ecommerce.price where pricetype_id = 4 
+and sourceclass_id = 9 
+and active=true 
+and coalesce(startdate,'20110101') < now() 
+and coalesce(enddate,'20120101') > now())
+
+
+
+--> Are there any gift certificates that do NOT have expedited shipping? 
+
+select i.item_id,i.name,pv.name
+from ecommerce.item as i,ecommerce.productversion as pv
+where  i.vendor_id = 37
+and i.itemstatus_id = 0 
+and i.item_id = pv.item_id
+and pv.shippingoptionbitmask | 1 != 15;
+
+
+
+--> Are there any gift certificates under the wrong vendor? 
+
+select item_id,name
+from ecommerce.item
+where itemstatus_id = 0
+and vendor_id != 37
+and name like 'Gift Cert%';
+
+
+
+--> Are there any GTGM that do not have "free shipping" selected? 
+
+select item_id,name
+from ecommerce.item
+where  vendor_id = 77 
+and itemstatus_id = 0
+and shippingmechanism_id != 2;
+
+
+
+--> Are there any gift certificates that do not have "free shipping" selected? 
+
+select item_id,name
+from ecommerce.item
+where  vendor_id = 37 
+and itemstatus_id = 0
+and shippingmechanism_id != 2;
+
+
+
+--> Are there any GTGM or gift certs that do NOT have the "Exclude from Revenue Sharing" box checked? (should have 0 results)
+
+select item_id,name 
+from ecommerce.item 
+where itemstatus_id = 0 
+and vendor_id IN (37, 77)
+and itembitmask & 512 != 512
+order by name asc;
+
+
+--> Active CUSA int'l enabled items that are hooked up to SKUs missing a country of origin:
+
+select distinct s.sku_id, s.name
+from ecommerce.item as i, ecommerce.productversion as pv, ecommerce.productversionsku as pvs, ecommerce.sku as s
+where i.itembitmask & 8 = 8 
+and i.vendor_id = 83
+and i.itemstatus_id = 0
+and i.item_id = pv.item_id 
+and pv.productversion_id = pvs.productversion_id 
+and pvs.sku_id = s.sku_id 
+and s.itemstatus_id in (0,1)
+and s.skubitmask != 8
+and s.isocountrycodeoforigin IS null
+order by s.name asc; 
+
+
+
+
+--> PetEdge SKUs missing a fulfillment part #
+
+select s.sku_id from ecommerce.sku as s, ecommerce.item as i
+where i.item_id = s.item_id
+and i.vendor_id = 85
+and s.partnumber is null; 
+
+
+--> Sales of Jasmere items
+
+select
+    i.item_id,pv.name as version_name,count(distinct li.order_id),count(*),sum(li.customerprice)
+from
+    ecommerce.vendor as v
+    ,ecommerce.item as i
+    ,ecommerce.productversion as pv
+    ,ecommerce.rslineitem as li
+    ,ecommerce.paymentauthorization as pa
+where
+    v.vendor_id = 86
+    and v.vendor_id = i.vendor_id
+    and i.item_id = pv.item_id
+    and pv.productversion_id = li.productversion_Id
+    and li.order_id = pa.order_id
+    and pa.payment_transaction_result_id=1
+    and pa.payment_status_id in (3,5,6)
+group by i.item_id,pv.name
+order by sum(li.customerprice) desc
+
+
+
+--> How to find out what the IDs are for the various things that use bitmasks
+
+select * from ecommerce.sourceclass; 
+
+
+(from that, we can see that the item is "5". So,)
+
+
+
+--> How to find out what the current set of bits is in the item bitmask
+
+select * from ecommerce.sourcebitmask where sourceclass_id = 5; 
+
+
+
+
+--> How to find out what the current set of bits is for the SKU bitmask
+
+
+select * from ecommerce.sourcebitmask where sourceclass_id = 13; 
+
+
+
+--> Are there any active items with the Global Girlfriend checkbox checked that do not have the Primary Site set to GGF? (about 100)
+
+select item_id,name
+from ecommerce.item
+where itemstatus_id = 0
+and itembitmask & 16 = 16
+and primary_site_id != 344;
+
+
+select * from ecommerce.rsorder where oid IN (14140879, 14141434, 14211754, 14220143, 14241328, 14247881, 14253803, 14316951, 14341127, 14396187, 14456801, 14524796, 14527432, 14539319);
+
+
+
+--> Any active CUSA items set up to sell on GGF that do not have the Global Girlfriend box checked? (should pull 0)
+
+
+select item_id,name from ecommerce.item 
+where itemstatus_id = 0 
+and vendor_id = 83
+and itembitmask & 16 != 16 
+and site_availability_mask & 128 = 128; 
+
+
+
+--> Are there any active items with the Global Girlfriend checkbox checked that are not set up to sell on GG? (should pull just some promo items)
+
+select item_id,name from ecommerce.item 
+where itemstatus_id = 0 
+and itembitmask & 16 = 16 
+and site_availability_mask & 128 != 128; 
+
+
+
+
+--> Are there any active items that do NOT have the "exclude from revenue sharing box" checked AND are not hooked up to categories? (this should pull only PROMO items)
+
+
+select item_id,name 
+from ecommerce.item 
+where itemstatus_id = 0 
+and item_id not in (select distinct item_Id from ecommerce.category_item)
+and itembitmask & 512 != 512
+order by name asc;
+
+
+
+--> Are there any items with names like "PROMO" that do not have the "Not for Resale" box checked? (should pull 0)
+
+select item_id,name 
+from ecommerce.item 
+where itemstatus_id = 0 
+and name like 'PROMO%'
+and itembitmask & 256 != 256
+order by name asc;
+
+
+--> Set the "Not for Resale" and the "Exclude from Revenue Sharing" checkboxes for any PROMO items that don't have the "Not for Resale" box checked
+
+update ecommerce.item set itembitmask = 768
+where item_id IN (
+select item_id
+from ecommerce.item 
+where itemstatus_id = 0 
+and name like 'PROMO%'
+and itembitmask & 256 != 256
+order by name asc);
+
+
+
+
+--> Look up everything about receiving event 57971, including its inventory
+
+select * from ecommerce.receivingevent as re, ecommerce.rsinventoryitem as ii 
+where re.receivingevent_id = 57971 
+and ii.receivingevent_id = re.receivingevent_id
+
+
+
+--> Look up any inventory records tied to receiving event 49320
+
+select * from ecommerce.rsinventoryitem where receivingevent_id = 49320
+
+
+
+--> List of all active categories not hooked up to any site
+
+select distinct category_id,name 
+from ecommerce.category 
+where active = true
+and category_Id not in (select category_Id from ecommerce.sitecategory);
+
+
+
+--> Are there any inactive categories hooked up to a site? (just old Sale categories)
+
+select distinct category_id,name 
+from ecommerce.category 
+where active = false
+and category_Id in (select category_Id from ecommerce.sitecategory);
+
+
+--> How many instances are there of various image types? 
+
+select keyName,count(*) 
+from ecommerce.ggproductimage 
+group by keyName; 
+
+
+--> Show LinkShare orders
+
+select oid,orderdate 
+from ecommerce.rsorder 
+where linkshare_site_id is not null 
+order by orderdate; 
+
+
+--> Show amounts of LinkShare orders?
+
+select p.amount from ecommerce.paymenttransaction as p, ecommerce.rsorder as r
+where p.order_id = r.oid
+and r.linkshare_site_id is not null 
+order by r.orderdate;
+
+
+
+--> Show amounts of Specific LinkShare orders? 
+
+select pa.amount, r.oid, r.orderdate from ecommerce.paymentauthorization as pa, ecommerce.rsorder as r
+where pa.order_id = r.oid
+and pa.payment_transaction_result_id=1
+and pa.payment_status_id in (3,5,6)
+and r.linkshare_site_id is not null;
+
+
+--> Show everything about order blah? 
+
+select * from ecommerce.rsorder
+where oid = 13482888;
+
+select amount from ecommerce.paymenttransaction as p, ecommerce.rsorder as o
+where transaction_id = 13781542;
+
+
+
+--> Show any orders with more than one auth
+
+select order_id,count(*) from ecommerce.paymentauthorization 
+where payment_status_id = 3 
+and payment_transaction_result_id = 1 
+group by order_id having count(*) > 1; 
+
+
+
+--> Any active versions that are hooked up to a SKU with a quantity that is not 1. 
+(audited 2/28/2011, found 1 error out of 331 versions)
+(audited 2/8/2012, found 2 errors out of 265 versions)
+
+select distinct p.name, p.productversion_id, v.quantity
+from ecommerce.productversionsku as v, ecommerce.productversion as p
+where p.productversion_id = v.productversion_id
+and p.itemstatus_id = 0
+and v.quantity != 1;
+
+
+
+
+
+
+--> Disabled SKUs with retail inventory > 0, with summed count and inventory value
+
+select s.sku_id, s.name, sum (rs.quantity), r.receiveddate, sum (rs.merchantprice * rs.quantity)
+from ecommerce.sku as s, ecommerce.receivingevent as r, ecommerce.rsinventoryitem as rs
+where s.sku_id = rs.sku_id
+and r.receivingevent_id = rs.receivingevent_id
+and s.itemstatus_id = 7
+and rs.inventory_item_class_id = 1
+group by s.sku_id, s.name, r.receiveddate
+having sum (rs.quantity) > 0
+order by r.receiveddate desc;
+
+
+
+
+
+--> Partially Complete SKUs with retail inventory > 0, with summed count and inventory value
+
+select s.name, s.sku_id, sum (rs.quantity)
+from ecommerce.sku as s, ecommerce.rsinventoryitem as rs
+where s.sku_id = rs.sku_id
+and s.itemstatus_id = 3
+and rs.inventory_item_class_id = 1
+group by s.sku_id, s.name
+having sum (rs.quantity) > 0
+order by s.sku_id desc;
+
+
+
+--> Any inventory records with quantity less than 0?
+
+select oid, sku_id
+from ecommerce.rsinventoryitem
+where quantity < 0;
+
+
+
+
+
+--> Partially Complete SKUs that are not hooked up to any version
+
+select s.sku_id 
+from ecommerce.sku as s 
+where s.itemstatus_id = 3 
+and s.sku_id not in (select sku_id from ecommerce.productversionsku);
+
+
+
+
+--> Query Doug is using for version reactivation
+
+select distinct i.item_id,its.itemstatus,pv.productversion_id,sts.itemstatus as skustatus,pv.name
+from ecommerce.item as i,ecommerce.itemstatus as its,ecommerce.itemstatus as sts,ecommerce.productversion as pv
+,ecommerce.productversionsku as pvs, ecommerce.sku as s, ecommerce.rsinventoryitem ii
+where i.item_id = pv.item_id 
+and i.vendor_id = 83
+and i.itemstatus_id in (0,1,5,8) 
+and i.itemstatus_id = its.itemstatus_id
+and pv.productversion_id = pvs.productversion_id 
+and pv.itemstatus_id in (1)
+and pvs.sku_id = s.sku_id 
+and s.itemstatus_id = sts.itemstatus_id
+and s.itemstatus_id = 0 
+and s.sku_id = ii.sku_id
+and ii.inventory_item_type_id = 1 
+and ii.inventory_item_class_id = 1 
+and ii.quantity > 0 
+and ii.aisle is not null
+and pv.productversion_id not in (select pvs.productversion_id from ecommerce.productversionsku as pvs,ecommerce.sku as s where pvs.sku_id = s.sku_id and s.itemstatus_id in (1,5,8))
+order by its.itemstatus,i.item_id
+
+
+
+
+--> Sum of base cost (PO cost only!) of nonzero WHOLESALE CUSA inventory
+
+select s.sku_id, s.name, rs.oid as inventory_record, sum (rs.quantity), r.receiveddate, sum (rs.merchantprice * rs.quantity)
+from ecommerce.sku as s, ecommerce.receivingevent as r, ecommerce.rsinventoryitem as rs, ecommerce.item as i
+where s.sku_id = rs.sku_id
+and s.item_id = i.item_id
+and r.receivingevent_id = rs.receivingevent_id
+and i.vendor_id = 83
+and rs.inventory_item_class_id = 2
+group by s.sku_id, s.name, rs.oid, r.receiveddate
+having sum (rs.quantity) > 0
+order by r.receiveddate desc; 
+
+
+--> Sum of base cost (PO cost only!) of nonzero RETAIL CUSA inventory
+
+select s.sku_id, s.name, rs.oid as inventory_record, sum (rs.quantity), r.receiveddate, sum (rs.merchantprice * rs.quantity)
+from ecommerce.sku as s, ecommerce.receivingevent as r, ecommerce.rsinventoryitem as rs, ecommerce.item as i
+where s.sku_id = rs.sku_id
+and s.item_id = i.item_id
+and r.receivingevent_id = rs.receivingevent_id
+and i.vendor_id = 83
+and rs.inventory_item_class_id = 1
+group by s.sku_id, s.name, rs.oid, r.receiveddate
+having sum (rs.quantity) > 0
+order by r.receiveddate desc; 
+
+
+
+--> Show all processed orders that had coupon code "DIVINE" on them, and the line items and qtys. affected by the code
+
+select distinct o.orderdate, o.oid, li.productversion_id, v.name, li.quantity from ecommerce.rsorder as o, ecommerce.rslineitem as li, ecommerce.orderpromotion as op, ecommerce.promotion as p, ecommerce.productversion as v
+where o.oid = op.order_id
+and op.promotion_id = p.promotion_id
+and p.promotion_id = li.promotion_id
+and v.productversion_id = li.productversion_id
+and o.oid = li.order_id
+and o.processingstatus = 'PROCESSED'
+and p.promotioncode = 'DIVINE';
+
+
+--> Show all processed orders that purchased one of two version IDs (53643, 53644), including the e-mail address on the account
+
+select distinct o.orderdate, o.oid, a.email, li.productversion_id, v.name, li.quantity from ecommerce.rsorder as o, ecommerce.rslineitem as li, ecommerce.productversion as v, pheme.account as a
+where v.productversion_id = li.productversion_id
+and o.oid = li.order_id
+and o.account_id = a.account_id
+and o.processingstatus = 'PROCESSED'
+and v.productversion_id IN (53644, 53643)
+order by o.oid desc;
+
+
+
+--> Show orders that had the promotion code "CRAZYDEAL" on them and had an auth amount of less than $25. 
+
+select o.oid, pa.amount from ecommerce.rsorder as o, ecommerce.orderpromotion as op, ecommerce.promotion as p, ecommerce.paymentauthorization as pa
+where o.oid = op.order_id
+and op.promotion_id = p.promotion_id
+and o.oid = pa.order_id
+and o.processingstatus = 'PROCESSED'
+and p.promotioncode like '%CRAZYDEAL%'
+and pa.amount < 25;
+
+
+
+--> Count of inventory records that are active with 0 qty. 
+
+select count(*) from ecommerce.sku as s,ecommerce.rsinventoryitem as ii where ii.sku_id = s.sku_id and ii.active=true and s.itemstatus_Id = 5 and ii.quantity > 0;
+select s.sku_id, sum (ii.quantity) from ecommerce.sku as s, ecommerce.rsinventoryitem as ii, ecommerce.item as i
+where s.sku_id = ii.oid
+and s.item_id = i.item_id
+and s.itemstatus_id = 0
+and s.skubitmask &1 = 1
+and i.vendor_id = 83
+group by s.sku_id
+having sum (ii.quantity) = 0;
+
+
+
+--> Active inventory records at qty. 0
+
+select ii.oid, s.name
+from ecommerce.rsinventoryitem as ii, ecommerce.sku as s, ecommerce.item as i
+where ii.sku_id = s.sku_id
+and s.item_id = i.item_id
+and ii.quantity = 0
+and i.vendor_id = 83
+and ii.active = true
+order by ii.oid asc;
+
+
+
+--> Show all inventory records, quantities, costs, receiving events, for SKU xxxxx
+
+select oid, quantity, merchantprice, purchaseorder, supplier_id, inventory_item_type_id, aisle, bay, shelf, bin, receivingevent_id, inventory_item_class_id from ecommerce.rsinventoryitem where sku_id = 38496;
+
+
+--> Are there any inactive version prices? (nonpromotional version prices... i.e., retail, wholesale, and tax deductible prices only.)
+
+select p.price_id, p.source_id, p.promotion_id from ecommerce.price as p, ecommerce.productversion as v
+where p.source_id = v.productversion_id
+and p.active = false
+and p.sourceclass_id = 9
+and p.pricetype_id != 3
+and v.itemstatus_id = 0;
+
+
+--> All versions with a version-level price, of Active and Inactive items only 
+
+select p.price_id, p.source_id, p.promotion_id from ecommerce.price as p, ecommerce.productversion as v, ecommerce.item as i
+where p.source_id = v.productversion_id
+and v.item_id = i.item_id
+and p.sourceclass_id = 9
+and p.pricetype_id != 3
+and v.itemstatus_id = 0;
+
+
+--> How many versions of active and inactive items are there? 
+
+select count (*) from ecommerce.productversion as v, ecommerce.item as i
+where p.item_id = i.item_id
+and p.itemstatus_id IN (0,1)
+and i.itemstatus_id IN (0,1); 
+
+
+
+--> Add a version price to version 68679
+
+insert into ecommerce.price (price_id, pricetype_id, sourceclass_id, source_id, active, customerprice, startdate) 
+values (nextval('ecommerce.seq_price'), 1, 4, 69374, true, 25, '2011-10-26:00:00.0');
+
+
+--> Add a tax deductible price to version 69375
+
+insert into ecommerce.price (price_id, pricetype_id, sourceclass_id, source_id, active, customerprice, startdate) 
+values (nextval('ecommerce.seq_price'), 4, 9, 69375, true, 26, '2011-10-26:00:00.0');
+
+
+
+--> Look at all data about account "jnicecat@hotmail.com"
+
+select * from pheme.account where email = 'jnicecat@hotmail.com';
+
+
+
+--> Uncheck the "tracks inventory" box on any SKU whose item was in vendor 15
+
+update ecommerce.sku set skubitmask = 0
+where sku_id IN (select s.sku_id from ecommerce.sku as s, ecommerce.item as i
+where s.item_id = i.item_id
+and s.itemstatus_id = 5 
+and i.vendor_id = 15);
+
+
+update ecommerce.purchaseorderlineitem set unitprice = 5.46 where polineitem_id = 100784;
+
+update ecommerce.purchaseorderlineitem set purchaseorder_id = 27420 where polineitem_id = 102888;
+
+
+
+
+
+
+
+--> Activate account 'tkbo1@msn.com'
+
+update pheme.account set is_active = true where email = 'tkbo1@msn.com'; 
+
+
+
+--> Change a user's e-mail address
+
+update pheme.account set email = 'thegirls@wi.rrr.com' where email = 'thrgirls@wi.rrr.com';
+
+
+
+--> Delete inventory items that were created via receiving event 68518
+
+delete from ecommerce.rsinventoryitem where receivingevent_id = 77074;
+
+
+
+--> Change the status back to "New" for a POLI that wasn't received after all
+
+update ecommerce.purchaseorderlineitem set receivingstatus_id = 0 where polineitem_id = 96757;
+
+
+
+
+--> Delete receiving events 68518 and 68528
+
+delete from ecommerce.receivingevent where receivingevent_id IN (68518, 68528);
+
+
+
+
+--> Two bads queries for Julia
+
+
+select s.sku_id, s.name, sup.suppliername, ad.adjustment_quantity, ii.merchantprice, ad.date_record_added, coalesce(ad.reason,'None Given') as reason
+from ecommerce.sku as s, ecommerce.inventoryitem_adjustment as ad, ecommerce.rsinventoryitem as ii, ecommerce.supplier as sup
+where s.sku_id = ii.sku_id 
+and ii.oid = ad.destination_inventoryitem_id 
+and sup.supplier_id = ii.supplier_id 
+and ad.inventoryitem_adjustment_type_id = 5 
+and ad.adjustment_quantity <> 0 
+and ad.date_record_added::DATE >= date_trunc('month','20111001'::DATE) 
+and ad.date_record_added::DATE < date_trunc('month','20111001'::DATE) + cast('1 month' as interval)
+order by ad.date_record_added desc;
+
+select distinct s.sku_id, s.name, sup.suppliername, re.badreceivedcount, ii.merchantprice, re.receiveddate,re.notes,re.receivingevent_id
+from ecommerce.sku as s, ecommerce.receivingevent as re,ecommerce.purchaseorderlineitem as poli,ecommerce.purchaseorder as po, ecommerce.supplier as sup,ecommerce.rsinventoryitem as ii
+where re.polineitem_id = poli.polineitem_id 
+and poli.purchaseorder_id = po.purchaseorder_id 
+and po.supplier_id = sup.supplier_id 
+and poli.sku_id = s.sku_id 
+and s.sku_id = ii.sku_id 
+and re.receivingevent_id = ii.receivingevent_id 
+and re.badreceivedcount > 0 
+and re.receiveddate::DATE >= date_trunc('month','20111001'::DATE) 
+and re.receiveddate::DATE < date_trunc('month','20111001'::DATE) + cast('1 month' as interval)
+order by re.receiveddate desc;
+
+
+
+--> Change the price on a PO for four SKUs
+
+update ecommerce.purchaseorderlineitem set unitprice = 4.30 where purchaseorder_id = 27949 and sku_id in (66679, 66680, 66681, 66682);
+
+
+--> Change the merchant price for a bunch of inventory records
+
+update ecommerce.rsinventoryitem set merchantprice = 4.30 where oid in (103051, 103052, 103053, 103054, 103056, 103057, 103058, 103059, 103060, 103061, 103062, 103063, 103064, 103065, 103066);
+
+
+--> Remove a surcharge from a certain POLI
+
+update ecommerce.purchaseorderlineitem set flatratesurcharge = null, surchargetype_id = null where purchaseorder_id = 26225 and sku_id = 61201;
+
+
+--> Change what the SKU was on an already-received PO (note that this only works where the PO has just one SKU. If it has more than one, add another sku_id condition)
+
+update ecommerce.purchaseorderlineitem set sku_id = 62308 where purchaseorder_id = 27230
+
+
+--> Change what the PO is on a bunch of POLIs
+
+update ecommerce.purchaseorderlineitem set purchaseorder_id = 28225 where purchaseorder_id = 28068;
+
+
+--> Change the PO name and supplier name on some inventory items
+
+update ecommerce.rsinventoryitem set purchaseorder = 'SF-1-6-12-DebraGoldman-28225', supplier_id = 2250
+where sku_id IN (73487, 73488, 73489, 73490, 73491, 73492, 73493, 73494, 73496, 73497)
+
+
+--> Change the supplier name on some work units
+
+update in_progress.work_unit set supplier_name = 'Debra Goldman' where id IN (11875, 11876);
+
+
+--> Change an inventory record to live under a different SKU 
+
+update ecommerce.rsinventoryitem set sku_id = 62308 where oid = 112763;
+
+
+--> Change a receiving event for a SKU to live under a different PO (with the same SKU)
+
+update ecommerce.receivingevent set polineitem_id = 107069 where polineitem_id = 110650;
+
+
+
+--> Delete "matched" relationships where the parent or child item is retired. 
+
+delete from ecommerce.matching_item as mi using ecommerce.item as i where i.itemstatus_id = 5 and i.item_id = mi.parent_item_id; 
+
+delete from ecommerce.matching_item as mi using ecommerce.item as i where i.itemstatus_id = 5 and i.item_id = mi.child_item_id;
+
+
+--> Remove retired items from their categories
+
+delete from ecommerce.category_item where item_id IN (select i.item_id from ecommerce.item as i, ecommerce.category_item as ci
+where ci.item_id = i.item_id
+and i.itemstatus_id = 5);
+
+
+
+--> Delete the "matched" relationship to item 38436
+
+delete from ecommerce.matching_item as mi 
+using (select parent_item_id,count(*) from ecommerce.matching_item group by parent_item_id having count(*) = 1) as t 
+where mi.parent_item_id = t.parent_item_id 
+and mi.child_item_id = 38436;
+
+
+--> create a new PO with a nonexistent PO #
+
+insert into ecommerce.purchaseorder (purchaseorder_id, supplier_id, paymentterms_id, purchaseorderstatus_id, isreorder, dateissued, shipdate, ponumber, paymentduedate, buyeruid, facility_id, date_record_added, is_consignment)
+values (10012, 179, 8, 7, 0, '2003-01-01 00:00:00', '2003-06-01 00:00:00', 'Pre-Beowulf-PO-Pumpernickel-2003-2', '2003-12-01 00:00:00', 'gregh', 3, '2003-01-01 00:00:00', false);
+
+
+--> create a new item
+
+insert into ecommerce.item (item_id, vendor_id, itemstatus_id, name, daterecordadded, shippingmechanism_id, primarycategory_id, datelastmodified, itembitmask, primarysite_id, site_availability_mask)
+values (nextval('ecommerce.seq_item'), 83, 3, '', '2012-12-12', 8, 3, '2012-12-12', 88, 344, 3999)
+
+
+
+
+PROMO SKU CREATION
+
+1) First, create a new Promo Item, or repurpose an existing Void item. This is done in the application, not through the DB. Copy over most info from the regular item, except prepend the name with "PROMO - ", and mark the following Misc Options boxes: Tax Exempt, Suppress Royalty Messaging, Ships International (if applicable), Not for Resale, and Exclude from Revenue Sharing. Also, don't add any checks for Site Availability, and don't add to any categories. Don't add any keywords; we don't want this item "findable" on the front end. 
+
+
+2) Now that you have the item's ID #, create a SKU "pointing" to it, with appropriate data, as follows: 
+
+insert into ecommerce.sku (sku_id, itemstatus_id, daterecordadded, item_id, skutype_id, name, isocountrycodeoforigin, primarybuyeruid, skubitmask, sku_class_id, tariff_code) 
+values (nextval('ecommerce.seq_sku'), 2, '2012-08-22', 50477, 1, 'PROMO - Purple Paw Cuffed Slipper Socks', 'CN', 'sheila', 1, 1, '6115.95.9000');
+
+
+3) Now that you have a SKU ID, you can insert a new POLI for that SKU ID onto the existing purchase order, using a format like this: 
+
+insert into ecommerce.purchaseorderlineitem (polineitem_id, purchaseorder_id, sku_id, quantityordered, unitprice, supplier_part_number, is_reorder, description, unitofmeasure_id, daterecordadded, duty_perc) 
+values (nextval('ecommerce.seq_purchaseorderlineitem'), 26551, 78835, 1500, 0.98, 'S3F1578', false, 'PROMO - Purple Paw Cuffed Slipper Socks', 1, '2011-08-22 11:001:50.483', 14.6);
+
+Or, if there's an existing POLI on the wrong PO, you could point it to the correct PO like this: 
+
+update ecommerce.purchaseorderlineitem set purchaseorder_id = 24720 where polineitem_id = 100250;
+
+
+
+4) Adjust down the quantities ordered on the "regular" SKUs, as follows:
+
+update ecommerce.purchaseorderlineitem set quantityordered = 1500 where polineitem_id = 95090;
+
+
+5) Next, create an inventory item for the SKU in Pandora by "receiving" the SKU. That's all done in the Pandora UI. 
+
+If needed, you could create a new inventory item for the SKU like this: 
+
+insert into ecommerce.rsinventoryitem (oid, quantity, weight, merchantprice, supplier_id, daterecordadded, initialquantity, sku_id, inventory_item_type_id, inventory_item_class_id, active)
+values (nextval('ecommerce.seq_rsinventoryitem'), 20, 5.0, 5.45, 895, '2012-09-18', 20, 79460, 1, 1, true)
+
+
+Also if needed, you could create a new receiving event like this. (NOTE: the inventory item creation has to come first, THEN you can create the receiving event.)
+
+insert into ecommerce.receivingevent (receivingevent_id, polineitem_id, receiveddate, totalreceivedcount, badreceivedcount, notes, inventoryitem_id, unitweight)
+values (nextval('ecommerce.seq_receivingevent'), 116691, '2009-11-02', 172, 0, 'Receiving a PROMO SKU to fix data -CW', 64718, 5)
+
+(For instance, in the case of fixing old data where the inventory record already exists.)
+
+In that case, you would also need to adjust the inventory record as well by adding the receiving event ID to it, like so: 
+
+update ecommerce.rsinventoryitem set receivingevent_id = 78469 where oid = 64718;
+
+Also in that case, don't forget step 9, fixing the data in Cassandra. 
+
+
+7) Adjust down the quantities received on the "regular" receiving events. That can also be done in the Pandora UI. 
+
+Or, if necessary, you could do something like this: 
+
+update ecommerce.receivingevent set totalreceivedcount = 3371 where receivingevent_id = 32851;
+
+
+8) Adjust down the quantity in the regular inventory item (if necessary). Either in Pandora or in the DB thuswise: 
+
+update ecommerce.rsinventoryitem set quantity = quantity - 250 where oid = 189275;
+
+
+9) Alert the FC to relabel their bins / move the quantity. 
+
+
+10) Go into Cassandra and search for the PO. If it's already in a shipment, then ensure that the shipment for that PO now includes the correct info -- add the new SLI(s), and modify the "Quantity Shipped" for SLI(s) that need to be adjusted down. Double-check that the landed cost is flowing through to Fawkes correctly by searching for the regular and PROMO SKUs and comparing their landed costs. 
+
+
+11) Once the FC is all set and has added a location, activate the SKU, create a version for it as per usual, launch the item. You should also add images, etc. There's no need to create a work unit in the In Progress queue for it. If you're super-thorough, feel free, but honestly, no one is going to care, since you're just repurposing the work that was done for the regular retail item. It's just extra work for no reason. 
+
+
+12) Tell the buying team you're all done!
+
+
+
+
+--> Change the "is reorder" flag on a POLI from "yes" to "no"
+
+update ecommerce.purchaseorderlineitem set is_reorder = false where polineitem_id = 95863;
+
+
+
+--> Back out two inventory adjustments that Mike made -- revert the quantities, and delete the adjustments. 
+
+update ecommerce.rsinventoryitem set quantity = quantity + 200 where oid = 183667;
+update ecommerce.rsinventoryitem set quantity = quantity - 5000 where oid = 186126;
+delete from ecommerce.inventoryitem_adjustment where inventoryitem_adjustment_id = 140434;
+
+select * from ecommerce.inventoryitem_adjustment where destination_inventoryitem_id = 183667;
+
+
+--> Add a certain item to a certain promotion for certain dates: 
+
+insert into ecommerce.price (price_id, pricetype_id, sourceclass_id, source_id, active, customerprice, promotion_id, startdate, enddate) 
+values (nextval('ecommerce.seq_price'),3, 5, 46144, true, 7, 2760, '2011-12-14 11:00:00.0', '2011-12-15 00:00:00.0');
+
+
+--> Create new vendor "Jasmere"
+
+insert into ecommerce.vendor (vendor_id, active, name, url, handlingfee)
+values (nextval('ecommerce.seq_vendor'),false,'Jasmere','www.jasmere.com',0.00)
+
+
+
+--> Create new item (for when the "create" button is busted)
+
+insert into ecommerce.item (item_id, vendor_id, itemstatus_id, name, daterecordadded, shippingmechanism_id, primarycategory_id, datelastmodified, lastmodifiedby, itembitmask, primary_site_id, site_availability_mask)
+values (nextval('ecommerce.seq_item'), 77, 4, 'Warm Beds for Shelter Animals', 2012-12-11, 2, 17, 2012-12-11, catherine, 555, 310, 3999);
+
+
+--> Create new version of an existing item
+
+insert into ecommerce.productversion (productversion_id, item_id, itemstatus_id, name, daterecordadded, datelastmodified, lastmodifiedby, prekitted, shippingoptionbitmask)
+values (nextval('ecommerce.seq_productversion'),49514, 1, 'Clean Go Pet Graffiti Puppy Pads', '2012-04-23 15:34:00', '2012-04-23 16:00:00', 'catherine', 0, 15)
+
+
+
+
+--> Find launched work units modified after 10-01: 
+
+select * from in_progress.work_unit where status = 17 and updated_at > '2011-10-01 00:00:00';
+
+
+--> Find launched work units that are missing an item_id: 
+
+select image_notes, date_launched, id, name from in_progress.work_unit 
+where status = 17 
+and item_id is null
+order by id desc;
+
+
+--> Find the item ID of images with a certain filename
+
+select distinct item_id from ecommerce.ggproductimage where filename like 'h-PigHangDecor%';
+
+
+--> Add an item ID to a preexisting work unit: 
+
+update in_progress.work_unit 
+set item_id = 35132
+where id = 3443;
+
+
+--> Delete a launched work unit: 
+
+delete from in_progress.work_unit where id = 92;
+
+
+
+--> Change the start date on a certain price record 
+
+update ecommerce.price set startdate = '2012-03-30 12:00:00.0' where price_id = 212084;
+
+
+insert into ecommerce.price (price_id, pricetype_id, sourceclass_id, source_id, active, customerprice, promotion_id, startdate, enddate) 
+values (nextval('ecommerce.seq_price'),3, 5, 46144, true, 7, 2760, '2011-12-14 11:00:00.0', '2011-12-15 00:00:00.0');
+
+
+--> create a new ship-to address
+
+insert into ecommerce.rsaddress (address1, city, country, oid, state, zip, firstname, lastname, account_id)
+values ('900 Broadway Ste 301', 'New York', 'United States', (nextval('ecommerce.seq_oid'), 'NY', 10003, 'Marissa', 'Carberry', 7227861)
+
+
+
+
+--> Set an item name for launched work units that didn't have one
+
+update in_progress.work_unit 
+set item_id = item.item_id 
+from ecommerce.item 
+where ecommerce.item.name = in_progress.work_unit.name
+and status = 17
+and in_progress.work_unit.item_id is null; 
+
+
+--> Mass-update work unit names to an exact match item name
+
+update in_progress.work_unit 
+set item_id = item.item_id 
+from ecommerce.item 
+where in_progress.work_unit.item_id is null 
+and in_progress.work_unit.name = ecommerce.item.name
+and in_progress.work_unit.status = 17;
+
+
+
+--> Recreate work unit 9110 but point it at item 45459
+
+insert into in_progress.work_unit (id, work_unit_group_id, supplier_name, has_copy, has_proof, has_prep, has_shot, has_clean, status, notes, inv_value, name, final_name, ordinal, created_at, updated_at, last_modified_by, cleaned_by, item_id, date_launched) 
+values (8552, 588, 'Snow Leopard Trust', 0, 0, 0, 0, 0, 17, 'Held up due to Fawkes issues. Catherine\'s on the case. MC 5/31', 0, 'Snow Leopard Trust - 3/25', 1, 0, '2011-03-28 20:08:09.967308', '2011-06-03 21:07:42.192863', 'evanvick', 0, 45459, '2011-06-03 21:07:42.192863');
+
+
+
+
+--> Find work units without an item ID set, and a guess as to what the item name/ID could be: 
+
+select w.id, w.name, i.item_id, i.name 
+from in_progress.work_unit w, ecommerce.item i 
+where w.item_id is null 
+and w.name like '%' || i.name || '%' 
+and w.name != i.name;
+
+
+--> Mass-update all of them to what the guess is: 
+
+update in_progress.work_unit 
+set item_id = item.item_id 
+from ecommerce.item 
+where in_progress.work_unit.item_id is null 
+and in_progress.work_unit.name like '%' || ecommerce.item.name || '%' 
+and in_progress.work_unit.status = 17 
+and in_progress.work_unit.name != ecommerce.item.name;
+
+
+--> update all the work units with a null item_ID: replace ® with &reg;
+
+update in_progress.work_unit 
+set name = replace(name, '®', '&reg;') 
+where name like '%®%'
+and item_id is null; 
+
+
+--> Clear out category 445 entirely
+
+delete from ecommerce.category_item where category_id = 445;
+
+
+--> Repopulate category 445 with all active & inactive CharityUSA jewelry items
+
+select item_id from ecommerce.item where itemstatus_id IN (0, 1) and vendor_id = 83 and primarycategory_id = 3;
+
+Then paste that into Excel
+Then add a column to each side to get to this format: 
+
+
+--> Add a bunch of items to category 445
+
+insert into ecommerce.category_item (category_id, item_id) 
+values (445 , 38399 ), (445 , 44235 ), (445 , 30118 )
+(etc.)
+
+
+
+
+--> Clear out promotion 3108 of all sale records
+
+delete from ecommerce.promotion_item_category where promotion_id = 3108;
+delete from ecommerce.price where promotion_id = 3108;
+
+
+
+--> Set a dollar amount, a start date, and the "reward" certificate type on certain gift certificates
+
+update ecommerce.rscoupon
+set amountoff = 10, startdate = '2012-01-01 00:00:00.0', enddate = '2012-03-01 00:00:00.0', gift_certificate_type_id = 2
+where amountoff = 0
+and startdate >= '2011-12-15 00:00:00.0', enddate <= '2011-12-16 00:00:00.0'; 
+
+
+--> Look up what order(s) a gift certificate code was used on
+
+select o.order_id from ecommerce.rsordercoupon as o, ecommerce.rscoupon as gc
+where o.coupon_id = gc.oid
+and gc.code like '%SWCCFSZ4CFCS9C%';
+
+
+
+--> Look up the orders for e-mail address jo_sam_pug@yahoo.com, along with order line items and totals, and order adjustments. 
+
+select o.oid, o.orderdate, o.processingstatus, li.customerprice, li.customerpriceadjustment, li.shippingcost, li.tax, li.productversion_id, li.quantity, li.iscompitem, li.fulfillmentdate, li.lineitemtype_id, li.promotion_id, o.adjustmentamount, o.shippingcost from ecommerce.rsorder as o, ecommerce.rslineitem as li, pheme.account as a
+where o.oid = li.order_id
+and o.account_id = a.account_id
+and a.email = 'jo_sam_pug@yahoo.com'
+order by o.oid asc;
+
+
+--> Mass-change SKU names to "void[sku_id]" where the SKU is retired and is not hooked up to any versions and never appeared on any PO
+NOTE: Don't run this very often. It takes a really long time... 
+
+update ecommerce.sku set name = 'void' || sku_id 
+where itemstatus_id = 5 
+and sku_id not in (select sku_id from ecommerce.productversionsku) 
+and sku_id not in (select sku_id from ecommerce.purchaseorderlineitem);
+
+
+
+--> Mass-retire all non-retired SKUs that are not hooked up to any versions and never appeared on any PO
+
+update ecommerce.sku set itemstatus_id = 5
+where itemstatus_id IN (1, 2, 3, 4)
+and sku_id not in (select sku_id from ecommerce.productversionsku) 
+and sku_id not in (select sku_id from ecommerce.purchaseorderlineitem);
+
+
+
+--> Non-retired SKUs that are not hooked up to any versions and never appeared on any PO
+
+select sku_id, name from ecommerce.sku
+where itemstatus_id IN (0, 1, 2, 3, 4)
+and sku_id not in (select sku_id from ecommerce.productversionsku)
+and sku_id not in (select sku_id from ecommerce.purchaseorderlineitem);
+
+
+--> Add a new location to a SKU
+
+insert into ecommerce.sku_location (sku_location_id, sku_id, sku_location_status_id, aisle, bay)
+values (nextval('ecommerce.seq_sku_location'), 66691, 2, 14, H)
+
+
+TRICKS FROM DOUG
+
+--> Who modified item status, and when, for item 49629?
+
+select * from ecommerce.source_product_status_history where source_id = 49629 and sourceclass_id=5; 
+
+
+
+--> How many times have individual users modified an item status? 
+
+select modified_by,count(*) from ecommerce.source_product_status_history group by modified_by order by count(*);
+
+
+
+
+
+--> Remove a column from a table and nuke all the data in it: 
+
+alter table ecommerce.rsinventoryitem drop purchaseorder; 
+
+
+--> Goal progress report (when - then - else - end)
+
+case 
+when now()::DATE - g.startDate::DATE = 0 
+then (date_part('day', now()::DATE) * 1.0) / (g.days_in_month * 1.0) 
+else 1.0 
+end 
+AS date_ratio
+
+
+--> Counts of active, inactive, and retired items by vendor, in table form
+
+select v.name
+	,sum(1 - abs(sign(i.itemstatus_id - 0))) as active
+	,sum(1 - abs(sign(i.itemstatus_id - 1))) as inactive
+	, sum(1 - abs(sign(i.itemstatus_id - 5))) as retired
+from ecommerce.vendor as v,ecommerce.item as i
+where v.vendor_id = i.vendor_id and v.active = true
+group by v.name
+
+
+
+--> Lifetime royalty sums by site (query takes awhile to run)
+
+select
+    i.item_id
+    ,st.itemstatus
+    ,i.name
+    ,sum(COALESCE(sli.quantity,0.00) * COALESCE(sli.donationAmount,0.00) * (1 - abs(sign(sli.site_id - 220)))) AS ths_royalty
+    ,sum(COALESCE(sli.quantity,0.00) * COALESCE(sli.donationAmount,0.00) * (1 - abs(sign(sli.site_id - 221)))) AS trs_royalty
+    ,sum(COALESCE(sli.quantity,0.00) * COALESCE(sli.donationAmount,0.00) * (1 - abs(sign(sli.site_id - 224)))) AS bcs_royalty
+    ,sum(COALESCE(sli.quantity,0.00) * COALESCE(sli.donationAmount,0.00) * (1 - abs(sign(sli.site_id - 310)))) AS ars_royalty
+    ,sum(COALESCE(sli.quantity,0.00) * COALESCE(sli.donationAmount,0.00) * (1 - abs(sign(sli.site_id - 314)))) AS chs_royalty
+    ,sum(COALESCE(sli.quantity,0.00) * COALESCE(sli.donationAmount,0.00) * (1 - abs(sign(sli.site_id - 342)))) AS ms_royalty
+    ,sum(COALESCE(sli.quantity,0.00) * COALESCE(sli.donationAmount,0.00) * (1 - abs(sign(sli.site_id - 343)))) AS prs_royalty
+    ,sum(COALESCE(sli.quantity,0.00) * COALESCE(sli.donationAmount,0.00) * (1 - abs(sign(sli.site_id - 344)))) AS ggf_royalty
+    ,sum(COALESCE(sli.quantity,0.00) * COALESCE(sli.donationAmount,0.00) * (1 - abs(sign(sli.site_id - 345)))) AS vet_royalty
+    ,sum(COALESCE(sli.quantity,0.00) * COALESCE(sli.donationAmount,0.00) * (1 - abs(sign(sli.site_id - 2001)))) AS lit_royalty
+from
+    ecommerce.ProductVersion pv
+    ,ecommerce.RSLineItem li
+    ,ecommerce.Item i
+    ,ecommerce.itemstatus st
+    ,ecommerce.SiteLineItem sli
+    ,ecommerce.PaymentAuthorization pa
+where
+    li.productVersion_id = pv.productVersion_id
+    and pv.item_id = i.item_id
+    and i.itemstatus_id = st.itemstatus_id
+    and li.oid = sli.lineItem_id
+    and li.order_id = pa.order_id
+    and pa.payment_transaction_result_id = 1
+    and pa.payment_status_id in (3,5)
+group by 
+    i.item_id
+    ,st.itemstatus
+    ,i.name
+order by 
+    i.item_id
+    ,st.itemstatus
+    ,i.name
+
+
+
+
+
+
+--> States we collect tax from, revenue and tax collected by year, in a pivot table
+
+select
+    date_trunc('year',t.trandate)::DATE as Year_Start
+    ,sum(t.amount *  (position(upper(a.state) IN 'CA') * position('CA' IN upper(a.state)))) AS CA_Sales
+    ,sum(o.tax *  (position(upper(a.state) IN 'CA') * position('CA' IN upper(a.state)))) AS CA_Tax
+    ,sum(t.amount *  (position(upper(a.state) IN 'CO') * position('CO' IN upper(a.state)))) AS CO_Sales
+    ,sum(o.tax *  (position(upper(a.state) IN 'CO') * position('CO' IN upper(a.state)))) AS CO_Tax
+    ,sum(t.amount *  (position(upper(a.state) IN 'MI') * position('MI' IN upper(a.state)))) AS MI_Sales
+    ,sum(o.tax *  (position(upper(a.state) IN 'MI') * position('MI' IN upper(a.state)))) AS MI_Tax
+    ,sum(t.amount *  (position(upper(a.state) IN 'OH') * position('OH' IN upper(a.state)))) AS OH_Sales
+    ,sum(o.tax *  (position(upper(a.state) IN 'OH') * position('OH' IN upper(a.state)))) AS OH_Tax
+    ,sum(t.amount *  (position(upper(a.state) IN 'WA') * position('WA' IN upper(a.state)))) AS WA_Sales
+    ,sum(o.tax *  (position(upper(a.state) IN 'WA') * position('WA' IN upper(a.state)))) AS WA_Tax
+from
+    ecommerce.RSOrder o
+    ,ecommerce.RSAddress a
+    ,ecommerce.PaymentAuthorization pa
+    ,(select authorization_id,tranDate,amount from ecommerce.PaymentTransaction where payment_transaction_result_id = 1 and payment_transaction_type_id = 4
+	) t
+where
+    coalesce(o.shippingAddress_id,o.billingAddress_id) = a.oid
+    and o.oid = pa.order_id
+    and a.country = 'United States'
+    and pa.authorization_id = t.authorization_id 
+group by
+    date_trunc('year',t.trandate)::DATE
+order by
+    date_trunc('year',t.trandate)::DATE;
+
+
+
+
+
+--> Lifetime GTGM sales rolled up by item
+
+select
+    i.item_id,i.name as version_name,count(distinct li.order_id),count(*),sum(li.customerprice)
+from
+    ecommerce.vendor as v
+    ,ecommerce.item as i
+    ,ecommerce.productversion as pv
+    ,ecommerce.rslineitem as li
+    ,ecommerce.paymentauthorization as pa
+where
+    v.vendor_id = 77
+    and v.vendor_id = i.vendor_id
+    and i.item_id = pv.item_id
+    and pv.productversion_id = li.productversion_Id
+    and li.order_id = pa.order_id
+    and pa.payment_transaction_result_id=1
+    and pa.payment_status_id in (3,5,6)
+group by i.item_id,i.name
+order by sum(li.customerprice) desc
+
+
+
+
+--> Lifetime Daily Deal sales
+
+select
+    i.item_id,pv.name as version_name,count(distinct li.order_id),count(*),sum(li.customerprice),pa.authdate
+from
+    ecommerce.item as i
+    ,ecommerce.productversion as pv
+    ,ecommerce.rslineitem as li
+    ,ecommerce.paymentauthorization as pa
+    ,ecommerce.price as p
+where
+    i.item_id = pv.item_id
+    and pv.productversion_id = li.productversion_Id
+    and li.order_id = pa.order_id
+    and pa.payment_transaction_result_id=1
+    and p.source_id = i.item_id
+    and pa.payment_status_id in (3,5,6)
+    and p.promotion_id = 41
+group by i.item_id,pv.name
+order by pa.authdate desc;
+
+
+
+--> Lifetime GTGM sales by version name
+
+select
+    i.item_id,pv.name as version_name,count(distinct li.order_id),count(*),sum(li.customerprice)
+from
+    ecommerce.vendor as v
+    ,ecommerce.item as i
+    ,ecommerce.productversion as pv
+    ,ecommerce.rslineitem as li
+    ,ecommerce.paymentauthorization as pa
+where
+    v.vendor_id = 77
+    and v.vendor_id = i.vendor_id
+    and i.item_id = pv.item_id
+    and pv.productversion_id = li.productversion_Id
+    and li.order_id = pa.order_id
+    and pa.payment_transaction_result_id=1
+    and pa.payment_status_id in (3,5,6)
+group by i.item_id,pv.name
+order by sum(li.customerprice) desc
+
+
+
+
+--> For SKUs with an inventory record without a location set, find other locations for sister inventory records. 
+
+select s.sku_id,s.name,iic.inventory_item_class,sum(ii.quantity) as Quantity,
+max(coalesce(ii.aisle,0)) as Aisle,
+max(coalesce(ii.bay,'N/A')) as Bay 
+from ecommerce.sku as s,ecommerce.inventory_item_class as iic,ecommerce.rsinventoryitem as ii,ecommerce.item as i,
+(select sku_id from ecommerce.rsinventoryitem 
+where quantity > 0 
+and aisle is null) AS t 
+where s.sku_id = ii.sku_id 
+and s.sku_id = t.sku_id 
+and s.item_id = i.item_id 
+and i.vendor_id = 83 
+and ii.inventory_item_class_id = iic.inventory_item_class_id 
+and s.itemstatus_id in (0,1) 
+group by s.sku_id,s.name,iic.inventory_item_class; 
+
+
+
+
+--> Find the first and last dates of the occurrence of the "negative inventory" glitch on customer line items. 
+
+select min(date_record_added),max(date_record_added) from ecommerce.rslineitem where quantity < 0; 
+
+
+
+
+--> Shelter Challenge: Votes of top 10 shelters for the week of 07/04 to 07/10/2011:
+
+select t.shelter_id, count(*) as vote_count
+from
+    (
+        select
+          date_trunc('day', date_voted) as vote_date,
+          shelter_id,
+          ip_address,
+          to_char(date_voted, 'AM') as time_of_day
+        from chimera.shelter_vote
+        where  date_voted >= '2011-07-04'
+        and date_voted < '2011-07-11'
+        group by
+          vote_date,
+          shelter_id,
+          ip_address,
+          time_of_day
+    ) t
+group by t.shelter_id
+order by count(*) desc;
+
+
+
+--> US shopping carts without a US state set (includes abandoned carts)
+
+select max(oid),min(oid),count(*) from ecommerce.rsaddress where account_id is not null and country = 'United States' and state is null and oid > 6000000; 
+
+
+
+--> GTGM versions sold last month
+
+select to_char(pa.authDate::DATE,'yyyy-MM') AS sale_period,pv.productversion_id AS version_id,pv.name AS version_name,sum(COALESCE(li.quantity,0)) AS quantity,COALESCE(pr.customerPrice,0.00) AS unit_deduction,sum(COALESCE(li.quantity,0) * COALESCE(pr.customerPrice,0.00)) AS tax_deduct_amount
+from ecommerce.Item i,ecommerce.ProductVersion pv,ecommerce.RSLineItem li,ecommerce.Price pr,ecommerce.PaymentAuthorization pa,ecommerce.MerchantAccount ma,ecommerce.Site s
+where i.vendor_id in (40,77) 
+and i.item_id = pv.item_id 
+and pv.productVersion_id = li.productVersion_id 
+and li.order_id = pa.order_id 
+and pr.source_id = li.productVersion_id 
+and pr.priceType_id = 4 and pr.sourceClass_id = 9 
+and pa.payment_transaction_result_id = 1 
+and pa.payment_status_id in (3,5) 
+and pa.authDate::DATE >= date_trunc('month',now()::DATE) - cast('1 month' as interval) 
+and pa.authDate::DATE < date_trunc('month',now()::DATE) 
+and COALESCE(pv.initialLaunchDate,date_trunc('month',now()::DATE) - cast('1 month' as interval))::DATE <= pa.authDate::DATE 
+and pa.merchantaccount_id = ma.merchantaccount_id 
+and ma.site_id = s.site_id 
+and s.panaceasite_id in (1,2,3,4,5,6,10,11) 
+group by to_char(pa.authDate::DATE,'yyyy-MM'),pv.productversion_id,pv.name,COALESCE(pr.customerPrice,0.00)
+
+
+--> GTGM versions sold in the month of July (AUT and VET included)
+
+select to_char(pa.authDate::DATE,'yyyy-MM') AS sale_period,pv.productversion_id AS version_id,pv.name AS version_name,sum(COALESCE(li.quantity,0)) AS quantity,COALESCE(pr.customerPrice,0.00) AS unit_deduction,sum(COALESCE(li.quantity,0) * COALESCE(pr.customerPrice,0.00)) AS tax_deduct_amount
+from ecommerce.Item i,ecommerce.ProductVersion pv,ecommerce.RSLineItem li,ecommerce.Price pr,ecommerce.PaymentAuthorization pa,ecommerce.MerchantAccount ma,ecommerce.Site s
+where i.vendor_id in (40,77) 
+and i.item_id = pv.item_id 
+and pv.productVersion_id = li.productVersion_id 
+and li.order_id = pa.order_id 
+and pr.source_id = li.productVersion_id 
+and pr.priceType_id = 4 
+and pr.sourceClass_id = 9 
+and pa.payment_transaction_result_id = 1 
+and pa.payment_status_id in (3,5) 
+and pa.authDate::DATE >= date_trunc('month','20110715'::DATE) 
+and pa.authDate::DATE < date_trunc('month','20110715'::DATE) + cast('1 month' as interval) 
+and COALESCE(pv.initialLaunchDate,date_trunc('month','20110715'::DATE) - cast('1 month' as interval))::DATE <= pa.authDate::DATE 
+and pa.merchantaccount_id = ma.merchantaccount_id 
+and ma.site_id = s.site_id 
+and s.panaceasite_id in (1,2,3,4,5,6,10,11) 
+group by to_char(pa.authDate::DATE,'yyyy-MM'),pv.productversion_id,pv.name,COALESCE(pr.customerPrice,0.00)
+
+
+
+
+--> Status changes 
+
+select sourceclass_id,previous_itemstatus_id,new_itemstatus_id,count(*) 
+from ecommerce.source_product_status_history 
+where date_record_added >= '20111001' 
+group by sourceclass_id,previous_itemstatus_id,new_itemstatus_id; 
+
+
+--> Status changes for September only
+
+select sourceclass_id,previous_itemstatus_id,new_itemstatus_id,count(*) 
+from ecommerce.source_product_status_history 
+where date_record_added >= '20110901' and date_record_added < '20111001' 
+group by sourceclass_id,previous_itemstatus_id,new_itemstatus_id; 
+
+
+--> CharityUSA items that went from Active to Inactive in a certain timeframe. 
+
+select i.item_id, i.name
+from ecommerce.source_product_status_history as sh, ecommerce.item as i
+where sh.source_id = i.item_id
+and sh.date_record_added >= '2012-12-28 15:29:00' 
+and sh.date_record_added < '2013-01-02 08:41:00'
+and sh.sourceclass_id = 5
+and sh.previous_itemstatus_id = 0
+and i.vendor_id = 83
+and sh.new_itemstatus_id = 1; 
+
+
+--> Figuring out the new item-status-change-tracking stuff
+
+select sc.sourceclass,s.name,h.date_record_added from ecommerce.sku as s,ecommerce.source_product_status_history as h,ecommerce.sourceclass as sc where s.sku_id = h.source_id and h.sourceclass_id = sc.sourceclass_id and h.date_record_added > '20111004' and h.new_itemstatus_id = 1;
+
+
+
+--> 
+
+select h.date_record_added::DATE ,sum(1 - abs(sign(h.new_itemstatus_id - 2))) as created ,sum(1 - abs(sign(h.new_itemstatus_id - 3))) as partial ,sum(1 - abs(sign(h.new_itemstatus_id - 4))) as complete ,sum(1 - abs(sign(h.new_itemstatus_id))) as activated ,sum(1 - abs(sign(h.new_itemstatus_id - 1))) as deactivated ,sum(1 - abs(sign(h.new_itemstatus_id - 5))) as retired from ecommerce.source_product_status_history as h where h.sourceclass_id = 13 group by h.date_record_added::DATE order by h.date_record_added::DATE;
+
+
+
+--> Novica logging
+
+novica.log.2011-10-06:2011-10-06 19:10:25,042 ERROR [com.charityusa.novica.model.order.Order] Zero line items found to fulfill for order: 14781760 
+
+novica.log.2011-10-10:2011-10-10 19:10:29,953 ERROR [com.charityusa.novica.model.order.Order] Zero line items found to fulfill for order: 14817049 
+
+novica.log.2011-10-11:2011-10-11 19:10:27,255 ERROR [com.charityusa.novica.model.order.Order] Zero line items found to fulfill for order: 14811034 
+
+novica.log.2011-10-11:2011-10-11 19:10:27,259 ERROR [com.charityusa.novica.model.order.Order] Zero line items found to fulfill for order: 14827628 
+
+novica.log.2011-10-21:2011-10-21 13:10:25,555 ERROR [com.charityusa.novica.model.order.Order] Zero line items found to fulfill for order: 14902269 
+
+novica.log.2011-10-21:2011-10-21 13:10:40,038 ERROR [com.charityusa.novica.model.order.Order] Zero line items found to fulfill for order: 14902269 
+
+novica.log.2011-10-23:2011-10-23 08:10:30,711 ERROR [com.charityusa.novica.model.order.Order] Zero line items found to fulfill for order: 14919925 
+
+
+
+--> Last sale date on versions of retired item
+
+select max(li.fulfillmentdate), v.name, i.item_id, i.name
+from ecommerce.rslineitem as li, ecommerce.productversion as v, ecommerce.item as i
+where li.productversion_id = v.productversion_id
+and v.item_id = i.item_id
+and i.itemstatus_id = 5
+and i.vendor_id = 83
+and li.fulfillmentdate is not null 
+group by v.name, i.item_id, i.name
+order by v.name asc; 
+
+
+
+--> Medivet ID # to product version ID #
+
+select distinct poli.supplier_part_number, pv.productversion_id AS productversion_id, pvsku.quantity AS quantity 
+from ecommerce.SKU sku,ecommerce.ProductVersionSKU pvsku,ecommerce.productversion pv ,ecommerce.item i,ecommerce.purchaseorderlineitem poli 
+where sku.sku_id = pvsku.sku_id 
+and pvsku.productVersion_id = pv.productversion_id 
+and pv.item_id = i.item_id 
+and i.vendor_id = 82 
+and sku.sku_id = poli.sku_id;
+
+
+
+--> Find out about shipping options 
+
+select * from ecommerce.shippingoption; 
+
+select * from ecommerce.price where sourceclass_Id = 16; 
+
+
+
+
+--> Change $4.95 to $5.95 flat rate
+
+update ecommerce.shippingmechanism set shippingmechanism = '$5.95 Flat Rate' where shippingmechanism_id = 8;
+update ecommerce.shippingmechanism set shippingamount = 5.95 where shippingmechanism_id = 8;
+
+
+--> Change the international handling rate to $9.95 for jewelry items
+
+update ecommerce.item set internationalhandling = 9.95 where primarycategory_id = 3;
+
+
+--> Change the international handling rate to $12.95 for non-jewelry, non-charity items
+
+update ecommerce.item set internationalhandling = 12.95 where primarycategory_id IN (1, 5, 6, 7, 8, 9, 11, 12, 14, 19, 20);
+
+
+
+--> Add $3.00 to shipping option prices to 2-Day, 3-Day, and Overnight Shipping options.
+
+update ecommerce.price set customerprice = customerprice + 3.00 where price_id in (110684,110685,110716);
+
+
+
+--> Add $1 to the base price for all SKUs ordered on POs 27895 and 27949
+
+update ecommerce.purchaseorderlineitem set unitprice = unitprice + 1.00 where purchaseorder_id IN (27895, 27949)
+
+
+--> Outstanding to-be-captured orders: 
+
+select m.merchantaccount_id,m.merchantaccount,ps.payment_status,ptr.payment_transaction_result,m.partner,count(*),sum(a.amount),max(a.order_id),min(a.authdate),max(a.authdate) 
+from ecommerce.paymentauthorization as a,ecommerce.merchantaccount as m,ecommerce.payment_transaction_result as ptr,ecommerce.payment_status as ps 
+where m.merchantaccount_id = a.merchantaccount_id 
+and a.authdate >= '20120624' 
+and ps.payment_status = 'Authorized'
+and ptr.payment_transaction_result_id = a.payment_transaction_result_id 
+and a.payment_status_id = ps.payment_status_id 
+group by m.merchantaccount_id,ps.payment_status,ptr.payment_transaction_result,m.merchantaccount,m.partner 
+order by m.merchantaccount_id; 
+
+
+--> For all activity today: 
+
+select m.merchantaccount_id,m.merchantaccount,ps.payment_status,ptr.payment_transaction_result,m.partner,count(*),sum(a.amount),max(a.order_id),max(a.authdate) 
+from ecommerce.paymentauthorization as a,ecommerce.merchantaccount as m,ecommerce.payment_transaction_result as ptr,ecommerce.payment_status as ps 
+where m.merchantaccount_id = a.merchantaccount_id 
+and a.authdate::DATE = now()::DATE 
+and ptr.payment_transaction_result_id = a.payment_transaction_result_id 
+and a.payment_status_id = ps.payment_status_id 
+group by m.merchantaccount_id,ps.payment_status,ptr.payment_transaction_result,m.merchantaccount,m.partner 
+order by m.merchantaccount_id; 
+
+
+--> Product Royalty Report query (unaltered)
+
+select r.store_name,r.site_name,r.item_name,r.customer_price,r.quantity,r.royalty_factor,r.quantity * r.royalty_factor AS royalty_amount,r.donation_factor_conversion,r.quantity * r.royalty_factor * r.donation_factor_conversion AS commodity_amount,r.commodity_name
+from 
+	( select li.store_name AS store_name,s.name AS site_name,li.item_name AS item_name,sum(COALESCE(sli.quantity,0)) AS quantity,sum(COALESCE(sli.quantity,0) * COALESCE(li.customer_price,0.00)) AS customer_price,df.royaltyFactor AS royalty_factor,COALESCE(s.donationUnitPhrase,'No Assigned Commodity') AS commodity_name,COALESCE(s.donationFactorConversion,1) AS donation_factor_conversion
+from ecommerce.Site s,ecommerce.SiteLineItem sli,ecommerce.DonationFactor df,ecommerce.DonationFactor df2,
+		( select t.name AS store_name,i.name AS item_name,li.oid,COALESCE(li.customerPrice,0.00) AS customer_price
+		from ecommerce.store t,ecommerce.Item i,ecommerce.ProductVersion pv,ecommerce.RSLineItem li,ecommerce.RSOrder o,ecommerce.PaymentAuthorization pa
+		where t.store_id = o.store_id and o.oid = li.order_id and li.productVersion_id = pv.productVersion_id and li.customerPrice > 0.00 and COALESCE(li.lineItemType_id,1) in (1,5) and pv.item_id = i.item_id and i.itemBitMask & 2 != 2 and o.oid = pa.order_id and pa.payment_transaction_result_id = 1 and pa.payment_status_id in (3,5) and pa.authDate::DATE >= date_trunc('month',now()::DATE) - cast('1 month' as interval) and pa.authDate::DATE < date_trunc('month',now()::DATE)
+		 ) as li
+	where li.oid = sli.lineItem_id and sli.site_id = s.site_id and s.site_id = df.site_id and s.site_id = df2.site_id and df2.minPrice = 0.00 and sli.site_id = df.site_id and COALESCE(li.customer_price,0.00) >= df.minPrice and COALESCE(li.customer_price,0.00) < df.maxPrice
+	group by li.store_name,s.name,li.item_name,df.royaltyFactor,COALESCE(s.donationUnitPhrase,'No Assigned Commodity'),COALESCE(s.donationFactorConversion,1)
+ ) as r
+order by commodity_amount,r.item_name
+
+
+
+--> Product Royalty Report query, just for ARS, just for orders authorized between 7/23 and 7/28 (inclusive)
+
+select r.store_name,r.site_name,r.item_name,r.customer_price,r.quantity,r.royalty_factor,r.quantity * r.royalty_factor AS royalty_amount,
+r.donation_factor_conversion,r.quantity * r.royalty_factor * r.donation_factor_conversion AS commodity_amount,r.commodity_name
+from 
+	( select li.store_name AS store_name,s.name AS site_name,li.item_name AS item_name,sum(COALESCE(sli.quantity,0)) 
+AS quantity,sum(COALESCE(sli.quantity,0) * COALESCE(li.customer_price,0.00)) AS customer_price,df.royaltyFactor AS royalty_factor,
+COALESCE(s.donationUnitPhrase,'No Assigned Commodity') AS commodity_name,COALESCE(s.donationFactorConversion,1) AS donation_factor_conversion
+from ecommerce.Site s,ecommerce.SiteLineItem sli,ecommerce.DonationFactor df,ecommerce.DonationFactor df2,
+		( select t.name AS store_name,i.name AS item_name,li.oid,COALESCE(li.customerPrice,0.00) AS customer_price
+		from ecommerce.store t,ecommerce.Item i,ecommerce.ProductVersion pv,ecommerce.RSLineItem li,ecommerce.RSOrder o, ecommerce.PaymentAuthorization pa
+		where t.store_id = o.store_id 
+and o.oid = li.order_id 
+and li.productVersion_id = pv.productVersion_id 
+and li.customerPrice > 0.00 
+and COALESCE(li.lineItemType_id,1) in (1,5) 
+and pv.item_id = i.item_id 
+and i.itemBitMask & 2 != 2 
+and o.oid = pa.order_id 
+and pa.payment_transaction_result_id = 1 
+and pa.payment_status_id in (3,5) 
+and pa.authDate > '20120722' and pa.authDate < '20120729'
+		 ) as li
+	where li.oid = sli.lineItem_id 
+and sli.site_id = s.site_id 
+and s.site_id = 310 
+and s.site_id = df.site_id 
+and s.site_id = df2.site_id 
+and df2.minPrice = 0.00 
+and sli.site_id = df.site_id 
+and COALESCE(li.customer_price,0.00) >= df.minPrice 
+and COALESCE(li.customer_price,0.00) < df.maxPrice
+	group by li.store_name,s.name,li.item_name,df.royaltyFactor,COALESCE(s.donationUnitPhrase,'No Assigned Commodity'),
+COALESCE(s.donationFactorConversion,1)
+ ) as r
+order by commodity_amount,r.item_name
+
+
+
+--> Show summed inventory by PROMO item in descending order by sum
+
+select i.item_id,i.name,sum(floor(ii.quantity / pvs.quantity))from ecommerce.item as i, ecommerce.productversion as pv,ecommerce.productversionsku as pvs,ecommerce.rsinventoryitem as ii
+where i.name like 'PROMO%'
+and i.itemstatus_Id != 5
+and i.item_id = pv.item_id
+and pv.itemstatus_id != 5
+and pv.productversion_id = pvs.productversion_id
+and pvs.sku_id = ii.sku_id
+group by i.item_id,i.name
+order by sum(floor(ii.quantity / pvs.quantity)) desc 
+
+
+
+"I am wondering if you can run a query for me that would provide the agent fee amount for all except cancelled POs written from 01/01/09 through 12/31/2011. If you can provide the POID, the create date, the PO Status, and the agent fee amount (no other surcharges) then I can provide the report to John that he needs. " - Julissa
+
+--> (for the PO level)
+
+select purchaseorder_id, dateissued, purchaseorderstatus_id, flat_rate_surcharge
+from ecommerce.purchaseorder
+where dateissued > '2010-06-30'
+and dateissued < '2012-09-01'
+and flat_rate_surcharge is not null
+and surcharge_type_id = 32
+and purchaseorderstatus_id != 6
+order by purchaseorder_id desc;
+
+
+--> (for the POLI level)
+
+select po.purchaseorder_id, po.dateissued, po.purchaseorderstatus_id, li.flatratesurcharge
+from ecommerce.purchaseorder as po, ecommerce.purchaseorderlineitem as li
+where po.purchaseorder_id = li.purchaseorder_id
+and po.dateissued > '2010-06-30'
+and po.dateissued < '2012-09-01'
+and li.flatratesurcharge is not null
+and li.surchargetype_id = 32
+and po.purchaseorderstatus_id != 6
+order by po.purchaseorder_id desc;
+
+For column C
+  1 = New
+  3 = Incomplete
+  4 = Closed
+
+
+
+--> 30-day Sales query. 
+Popular items algorithm from Ron (last gathered July 11, 2012). This query returns all items on THS in ascending order by item ID, then the last 30 days' worth of sales (labeled as "customer price"), then 10% of unit quantities sold in the prior 335 days before that (labeled as "run count"). 
+
+select pv.item_id as id,sum( case when now()::date - pa.authDate::date <= 30 then li.customerPrice * sli.quantity else li.customerPrice * sli.quantity / 10.0 end ) as customerPrice,
+sum( case when now()::date - pa.authDate::date <= 30 then sli.quantity else sli.quantity / 10.0 end ) as runCount
+from ecommerce.PaymentAuthorization as pa,ecommerce.RSLineItem as li,ecommerce.SiteLineItem as sli,ecommerce.ProductVersion as pv
+where pv.itemstatus_id = 0 
+and pa.payment_transaction_result_id = 1 
+and pa.payment_status_id in (3,5,6)
+and pa.order_id = li.order_id
+and pa.authDate >= now ()::date - interval '365 days'
+and li.lineItemType_id = 1
+and li.oid = sli.lineItem_id
+and sli.site_id = 220 
+and pv.productVersion_id = li.productVersion_id 
+group by pv.item_id;
+
+
+--> Authorized purchases by site, by month, for the past 12 months. 
+
+select
+to_char(pa.authdate::DATE,'YYYY') as year
+,to_char(pa.authdate::DATE,'MM') as month
+,cast(SUM(pa.amount * (1 - ABS(SIGN(ma.site_id - 220)))) AS numeric(9,2)) as THS
+,cast(SUM(pa.amount * (1 - ABS(SIGN(ma.site_id - 221)))) AS numeric(9,2)) as TRS
+,cast(SUM(pa.amount * (1 - ABS(SIGN(ma.site_id - 224)))) AS numeric(9,2)) as BCS
+,cast(SUM(pa.amount * (1 - ABS(SIGN(ma.site_id - 310)))) AS numeric(9,2)) as ARS
+,cast(SUM(pa.amount * (1 - ABS(SIGN(ma.site_id - 314)))) AS numeric(9,2)) as CHS
+,cast(SUM(pa.amount * (1 - ABS(SIGN(ma.site_id - 342)))) AS numeric(9,2)) as MS
+,cast(SUM(pa.amount * (1 - ABS(SIGN(ma.site_id - 343)))) AS numeric(9,2)) as PRS
+,cast(SUM(pa.amount * (1 - ABS(SIGN(ma.site_id - 344)))) AS numeric(9,2)) as GGF
+,cast(SUM(pa.amount * (1 - ABS(SIGN(ma.site_id - 345)))) AS numeric(9,2)) as VET
+,cast(SUM(pa.amount * (1 - ABS(SIGN(ma.site_id - 346)))) AS numeric(9,2)) as AUT
+,cast(SUM(pa.amount * (1 - ABS(SIGN(ma.site_id - 2001)))) AS numeric(9,2)) as LIT
+,cast(SUM(pa.amount * (1 - ABS(SIGN(ma.site_id - 347)))) AS numeric(9,2)) as HFL
+,cast(SUM(pa.amount) AS numeric(9,2)) as total
+from ecommerce.rsorder as o,ecommerce.paymentauthorization as pa, ecommerce.merchantaccount as ma,ecommerce.site as s
+where o.oid = pa.order_id and o.merchant_account_id = ma.merchantaccount_id and ma.site_id = s.site_id
+      and pa.authdate >= date_trunc('month',now()::DATE) - cast('1 year' as interval)
+      and pa.payment_transaction_result_id = 1 and pa.payment_status_id in (3,5,6)
+group by to_char(pa.authdate::DATE,'YYYY'),to_char(pa.authdate::DATE,'MM')
+order by to_char(pa.authdate::DATE,'YYYY'),to_char(pa.authdate::DATE,'MM');
+

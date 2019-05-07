@@ -1,0 +1,220 @@
+{\rtf1\ansi\ansicpg1252\cocoartf1265\cocoasubrtf210
+{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+\margl1440\margr1440\vieww16280\viewh15420\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+
+\f0\fs24 \cf0 CURRENT BEST QUERY for redoing Origin Code Auth Report\
+\
+\
+  WITH ry AS (select li.order_id, sum(COALESCE(sli.quantity,0) * df.royaltyFactor) AS royalty \
+from ecommerce.RSLineItem as li, ecommerce.SiteLineItem as sli, ecommerce.DonationFactor as df, ecommerce.PaymentAuthorization as pa \
+where li.oid = sli.lineItem_id and sli.site_id = df.site_id  and COALESCE(li.customerprice,0.00) >= df.minPrice and COALESCE(li.customerprice,0.00) < df.maxPrice  and pa.order_id = li.order_id and pa.authDate >= now()::DATE - cast('1 day' as interval) and pa.authDate < now()::DATE and pa.payment_transaction_result_id = 1 and pa.payment_status_id in (3,5,6)\
+group by li.order_id\
+ )\
+ , gtgm AS (select li.order_id, sum(li.customerPrice * li.quantity) as gtgm_total \
+from ecommerce.rslineitem as li, ecommerce.productversion as pv, ecommerce.item as i, ecommerce.PaymentAuthorization as pa, ecommerce.rsorder as o \
+where li.order_id = o.oid and li.productversion_id = pv.productversion_id and pv.item_id = i.item_id and i.itembitmask & 32 = 32 and pa.order_id = li.order_id   and pa.authDate >= now()::DATE - cast('1 day' as interval) and pa.authDate < now()::DATE and pa.payment_transaction_result_id = 1 and pa.payment_status_id in (3,5,6) \
+group by li.order_id \
+ )\
+ , ship AS (select o2.oid as order_id, adj.promotion_id , o2.shippingcost, pact.inputparam, pact.amount, (CASE WHEN pact.inputparam = 'SHIPPING_PRICE' THEN pact.amount WHEN pact.inputparam = 'SHIPPING_DISCOUNT' THEN (o2.shippingcost - pact.amount)  ELSE o2.shippingcost  END ) shipping_price \
+from ecommerce.rsorder as o2, ecommerce.orderpromotion as op, ecommerce.rsadjustment as adj, ecommerce.promotion as p, ecommerce.promotionaction as pact, ecommerce.paymentauthorization as pa \
+where o2.oid = adj.order_id and o2.oid = op.order_id and op.promotion_id = p.promotion_id and p.promotion_id = pact.promotion_id and o2.oid = pa.order_id and pa.payment_transaction_result_id = 1 and pa.payment_status_id IN (3, 5, 6)  and pa.authDate >= now()::DATE - cast('1 day' as interval) and pa.authDate < now()::DATE\
+group by o2.oid, adj.promotion_id, o2.shippingcost, pact.inputparam, pact.amount\
+ )\
+ select '' as sale_date,COALESCE(o.originCode,'No Origin Code') AS origin_code,o.oid, sum(pa.amount) AS auth_amount, ship.inputparam, sum(coalesce(ship.shipping_price,0.00)) as shipping_price ,sum(coalesce(gtgm.gtgm_total,0.00)) as gtgm_total, sum(coalesce(o.tax,0.00)) as sales_tax, sum(ry.royalty) as royalty ,sum(pa.amount) - sum(coalesce(ship.shipping_price,0.00)) - sum(coalesce(gtgm.gtgm_total,0.00)) - sum(coalesce(o.tax,0.00)) - sum(ry.royalty) as adj_revenue ,COALESCE(s.name,'no name available') AS site_name \
+from ecommerce.PaymentAuthorization as pa,ecommerce.RSOrder as o LEFT OUTER JOIN ship ON o.oid = ship.order_id LEFT OUTER JOIN gtgm ON o.oid = gtgm.order_id LEFT OUTER JOIN ry ON o.oid = ry.order_id ,ecommerce.site as s \
+where pa.order_id = o.oid  and pa.payment_transaction_result_id = 1 and pa.payment_status_id in (3,5,6)  and pa.authDate >= now()::DATE - cast('1 day' as interval) and pa.authDate < now()::DATE and o.site_id = s.site_id  and s.site_id = 310\
+group by o.oid, ship.inputparam, COALESCE(o.originCode,'No Origin Code'), ship.shipping_price ,COALESCE(s.name,'no name available') \
+order by o.oid, ship.inputparam, COALESCE(o.originCode,'No Origin Code'), auth_amount desc\
+\
+\
+\
+CURRENT JAVASCRIPT + SQL CODE for redoing Origin Code Auth Report\
+\
+//\
+// Origin Code Auth Report - DRAFT REVISION\
+// Catherine Warren, 2015-11-03 to 06 (so far)\
+//\
+\
+var dayInterval = p["days2"];\
+var originCode = p["origin_code"];\
+var startDate = p["start"];\
+var endDate = p["end"];\
+var showAuth = p["show"];\
+var site = p["site2"];\
+var platform = p["platform"];\
+var showOrderSource = p["showOrderSource"];\
+var showVersion = p["sv"];\
+\
+sum.push('order_count');\
+sum.push('auth_amount');\
+sum.push('gtgm_total');\
+sum.push('shipping');\
+sum.push('sales_tax');\
+sum.push('royalty');\
+sum.push('adj_revenue');\
+\
+var dateClause = "";\
+if (notEmpty(dayInterval)) \{\
+	dateClause = dateClause + "pa.authDate >= now()::DATE - cast('" + dayInterval + " day' as interval)";\
+    if (dayInterval == 0) \{\
+         dateClause = dateClause + " and pa.authDate > now()::DATE";\
+    \} else \{\
+         dateClause = dateClause + " and pa.authDate < now()::DATE";\
+    \}\
+\} else \{\
+	// empty interval, so we're using only dates...\
+    if (notEmpty(startDate)) \{\
+    	dateClause = dateClause + "pa.authDate >= '" + startDate + "'";\
+        if (notEmpty(endDate)) \{\
+        	dateClause = dateClause + " and pa.authDate < '" + endDate + "'";\
+        \}\
+    \} else \{\
+    	dateClause = dateClause + "pa.authDate >= date_trunc('month',now()::DATE)";\
+    \}\
+\}\
+\
+//var orderProcessor = new SelectSQLBuilder();\
+//orderProcessor.setSelect ("select o2.oid as order_id, adj.promotion_id , o2.shippingcost, pact.inputparam, pact.amount, (CASE WHEN pact.inputparam = 'SHIPPING_PRICE' THEN pact.amount WHEN pact.inputparam = 'SHIPPING_DISCOUNT' THEN (o2.shippingcost - pact.amount)  ELSE o2.shippingcost  END ) shipping_price INTO temptable orderData ");\
+//orderProcessor.setFrom ("from ecommerce.rsorder as o2, ecommerce.orderpromotion as op, ecommerce.rsadjustment as adj, ecommerce.promotion as p, ecommerce.promotionaction as pact, ecommerce.paymentauthorization as pa ");\
+//orderProcessor.setWhere ("o2.oid = adj.order_id and o2.oid = op.order_id and op.promotion_id = p.promotion_id and p.promotion_id = pact.promotion_id and o2.oid = pa.order_id and pa.payment_transaction_result_id = 1 and pa.payment_status_id IN (3, 5, 6) ");\
+//orderProcessor.appendWhere(dateClause.toString());\
+//orderProcessor.setGroupBy ("group by o2.oid, adj.promotion_id, o2.shippingcost, pact.inputparam, pact.amount ");\
+\
+var gtgmProcessor = new SelectSQLBuilder();\
+gtgmProcessor.setSelect("select li.order_id, sum(li.customerPrice * li.quantity) as gtgm_total ");\
+gtgmProcessor.setFrom("from ecommerce.rslineitem as li, ecommerce.productversion as pv, ecommerce.item as i, ecommerce.PaymentAuthorization as pa, ecommerce.rsorder as o ");\
+gtgmProcessor.setWhere("where li.order_id = o.oid and li.productversion_id = pv.productversion_id and pv.item_id = i.item_id and i.itembitmask & 32 = 32 and pa.order_id = li.order_id  ");\
+gtgmProcessor.appendWhere(dateClause.toString());\
+gtgmProcessor.appendWhere("pa.payment_transaction_result_id = 1 and pa.payment_status_id in (3,5,6) ");\
+gtgmProcessor.setGroupBy("group by li.order_id ");\
+\
+var shippingProcessor = new SelectSQLBuilder();\
+shippingProcessor.setSelect("select o2.oid as order_id, adj.promotion_id ");\
+shippingProcessor.appendSelect(" (CASE WHEN pact.inputparam = 'SHIPPING_PRICE' THEN pact.amount " + "WHEN pact.inputparam = 'SHIPPING_DISCOUNT' THEN (o2.shippingcost - pact.amount) " + " ELSE o2.shippingcost " + " END ) shipping_price ");\
+shippingProcessor.setFrom("from ecommerce.rsorder as o2, ecommerce.orderpromotion as op, ecommerce.rsadjustment as adj, ecommerce.promotion as p, ecommerce.promotionaction as pact, ecommerce.paymentauthorization as pa ");\
+shippingProcessor.setWhere("where o2.oid = adj.order_id and o2.oid = op.order_id and op.promotion_id = p.promotion_id and p.promotion_id = pact.promotion_id and o2.oid = pa.order_id and pa.payment_transaction_result_id = 1 and pa.payment_status_id IN (3, 5, 6) ");\
+shippingProcessor.appendWhere(dateClause.toString());\
+shippingProcessor.setGroupBy("group by o2.oid, adj.promotion_id, pact.inputparam, pact.amount, o2.shippingcost ");\
+\
+var royaltyProcessor = new SelectSQLBuilder();\
+royaltyProcessor.setSelect("select li.order_id, sum(COALESCE(sli.quantity,0) * df.royaltyFactor) AS royalty ");\
+royaltyProcessor.setFrom("from ecommerce.RSLineItem as li, ecommerce.SiteLineItem as sli, ecommerce.DonationFactor as df, ecommerce.PaymentAuthorization as pa ");\
+royaltyProcessor.setWhere("where li.oid = sli.lineItem_id and sli.site_id = df.site_id ");\
+royaltyProcessor.appendWhere("COALESCE(li.customerprice,0.00) >= df.minPrice and COALESCE(li.customerprice,0.00) < df.maxPrice ");\
+royaltyProcessor.appendWhere("pa.order_id = li.order_id");\
+royaltyProcessor.appendWhere(dateClause.toString());\
+royaltyProcessor.appendWhere("pa.payment_transaction_result_id = 1 and pa.payment_status_id in (3,5,6)");\
+royaltyProcessor.setGroupBy("group by li.order_id");\
+\
+var sqlProcessor = new SelectSQLBuilder();\
+\
+if (notEmpty(showAuth)) \{\
+	sqlProcessor.setSelect("select pa.authDate::DATE as sale_date,COALESCE(o.originCode,'No Origin Code') AS origin_code");\
+\} else \{\
+  hide.push('sale_date');\
+  sqlProcessor.setSelect("select '' as sale_date,COALESCE(o.originCode,'No Origin Code') AS origin_code");\
+\}\
+sqlProcessor.appendSelect("count(distinct o.oid) AS order_count, sum(pa.amount) AS auth_amount, sum(coalesce(ship.shipping_price,0.00)) as shipping_price ");\
+sqlProcessor.appendSelect("sum(coalesce(gtgm.gtgm_total,0.00)) as gtgm_total, sum(coalesce(o.tax,0.00)) as sales_tax, sum(ry.royalty) as royalty ");\
+sqlProcessor.appendSelect("sum(pa.amount) - sum(coalesce(ship.shipping_price,0.00)) - sum(coalesce(gtgm.gtgm_total,0.00)) - sum(coalesce(o.tax,0.00)) - sum(ry.royalty) as adj_revenue ");\
+//sqlProcessor.appendSelect("'sales.do?method=originCodeDetail&code=' || COALESCE(o.originCode,'No Origin Code') || '&start=' || '" + startDate + "' || '&end=' || '" + endDate + "' || '&days=' || '" + dayInterval + "' || '&show=' || '" + showAuth + "' AS subreporturl");\
+sqlProcessor.setFrom("from ecommerce.PaymentAuthorization as pa");\
+sqlProcessor.addCommonTableExpression("ry",royaltyProcessor);\
+sqlProcessor.addCommonTableExpression("gtgm",gtgmProcessor);\
+sqlProcessor.addCommonTableExpression("ship",shippingProcessor);\
+sqlProcessor.appendFrom("ecommerce.RSOrder as o LEFT OUTER JOIN gtgm ON o.oid = gtgm.order_id LEFT OUTER JOIN ship ON o.oid = ship.order_id LEFT OUTER JOIN ry ON o.oid = ry.order_id ");\
+sqlProcessor.setWhere("where pa.order_id = o.oid ");\
+sqlProcessor.appendWhere("pa.payment_transaction_result_id = 1 and pa.payment_status_id in (3,5,6) ");\
+sqlProcessor.appendWhere(dateClause);\
+\
+if (notEmpty(originCode)) \{\
+    sqlProcessor.appendWhere("o.originCode ILIKE '%" + originCode + "%'");\
+\}\
+if ("m" == platform) \{\
+    sqlProcessor.appendWhere("o.client_ip_address in ('54.215.150.37','54.241.179.159','54.215.150.33','54.215.148.134','54.208.37.246','54.236.100.183','54.208.57.30','54.208.37.89','54.154.19.105','54.154.18.247','54.172.227.126','54.174.197.243','54.67.78.16','54.67.110.97','54.246.211.85','54.246.211.102','54.229.31.168','54.229.72.158','54.64.130.216','54.64.71.56')");\
+\} else if ("d" == platform) \{\
+    sqlProcessor.appendWhere("o.client_ip_address not in ('54.215.150.37','54.241.179.159','54.215.150.33','54.215.148.134','54.208.37.246','54.236.100.183','54.208.57.30','54.208.37.89','54.154.19.105','54.154.18.247','54.172.227.126','54.174.197.243','54.67.78.16','54.67.110.97','54.246.211.85','54.246.211.102','54.229.31.168','54.229.72.158','54.64.130.216','54.64.71.56')");\
+\}\
+\
+if (notEmpty(showAuth)) \{\
+    sqlProcessor.setGroupBy("group by pa.authDate::DATE,COALESCE(o.originCode,'No Origin Code'), ship.shipping, ship.shipping_adj_amount ");\
+    sqlProcessor.setOrderBy("order by pa.authDate::DATE,auth_amount desc,COALESCE(o.originCode,'No Origin Code') ");\
+\} else \{\
+    sqlProcessor.setGroupBy("group by COALESCE(o.originCode,'No Origin Code'), ship.shipping_price ");\
+    sqlProcessor.setOrderBy("order by auth_amount desc,COALESCE(o.originCode,'No Origin Code') ");\
+\}\
+\
+if (notEmpty(showOrderSource)) \{\
+    sqlProcessor.appendSelect("st.name as store_name");\
+    sqlProcessor.appendSelect("os.order_source as order_source");\
+    sqlProcessor.appendFrom("ecommerce.store st");\
+    sqlProcessor.appendFrom("ecommerce.order_source os");\
+    sqlProcessor.appendWhere("o.store_id = st.store_id");\
+    sqlProcessor.appendWhere("o.order_source_id = os.order_source_id");\
+    sqlProcessor.appendGroupBy("st.name,os.order_source");\
+\} else \{\
+  hide.push('store_name');\
+  hide.push('order_source');\
+\}\
+\
+if ("ignoreAll" == site) \{\
+	hide.push('site_name');\
+\} else \{ // it's for a specific site or for all sites\
+    sqlProcessor.appendFrom("ecommerce.site as s ");\
+    sqlProcessor.appendWhere("o.site_id = s.site_id ");\
+    sqlProcessor.appendSelect("COALESCE(s.name,'no name available') AS site_name ");\
+    sqlProcessor.appendGroupBy("COALESCE(s.name,'no name available') ");\
+\}\
+\
+if ("showAll" != site && "ignoreAll" != site) \{\
+    sqlProcessor.appendWhere("s.site_id = " + site);\
+\}\
+\
+if (notEmpty(showVersion)) \{\
+    sqlProcessor.appendSelect("i.item_id, i.name as item_name, pv.productversion_id as version_id, pv.name AS version_name, count(li.productversion_id) as total_sold ");\
+    sqlProcessor.appendFrom("ecommerce.item as i, ecommerce.productversion as pv, ecommerce.rslineitem as li ");\
+    sqlProcessor.appendWhere("o.oid = li.order_id and li.productversion_id = pv.productversion_id and pv.item_id = i.item_id ");\
+    sqlProcessor.appendGroupBy("i.item_id, i.name, pv.productversion_id, pv.name ");\
+    hide.push('order_count');\
+    hide.push('auth_amount');\
+    hide.push('gtgm_total');\
+    hide.push('shipping');\
+    hide.push('sales_tax');\
+    hide.push('royalty');\
+    hide.push('adj_revenue');\
+\} else \{\
+    hide.push('item_id');\
+    hide.push('item_name');\
+    hide.push('version_id');\
+    hide.push('version_name');\
+    hide.push('total_sold');\
+\}\
+        \
+sql = sqlProcessor.queryString();\
+\
+\
+\
+Guidance from Ted: Join in the various types of shipping promotion as subqueries. \
+\
+Query for any order lacking a shipping promotion\
+Query for any order with a SHIPPING_PRICE promotion\
+Query for any order with a SHIPPING DISCOUNT promotion\
+\
+\
+sum(coalesce(noShipPromo.shipping_price,0.00)) as noShipPromoShippingPrice, sum(coalesce(shippingPrice.shipping_price,0.00)) as shippingPriceShippingPrice, sum(coalesce(shippingDiscount.shipping_price,0.00)) as shippingDiscountShippingPrice,\
+\
+\
+\
+X auth_date\
+X item_id\
+X item_name\
+X version_id\
+X version_name\
+X order_count\
+X customer_price\
+X item_count\
+X site_name\
+\
+}
