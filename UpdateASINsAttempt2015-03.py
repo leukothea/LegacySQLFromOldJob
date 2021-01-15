@@ -2,7 +2,7 @@ import psycopg2
 import os
 import sys
 
-pg_conn = psycopg2.connect("host='postdev-a.greatergood.net' dbname='charityusa' user='adminecom' password='ecommerce'")
+pg_conn = psycopg2.connect("host='postdev-a.greatergood.net' dbname='charityusa' user='adminecom' password=<pw goes here>")
 pg_cursor = pg_conn.cursor()
 email_text = ""
 openfile = open("VersionID-ASIN-data.csv", 'r')
