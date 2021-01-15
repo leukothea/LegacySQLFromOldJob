@@ -1,7 +1,7 @@
 import psycopg2
 import os
 
-pg_conn = psycopg2.connect("host='postgres-a.greatergood.net' dbname='charityusa' user='adminecom' password='ecommerce'")
+pg_conn = psycopg2.connect("host='postgres-a.greatergood.net' dbname='charityusa' user='adminecom' password=<pw goes here>")
 pg_cursor = pg_conn.cursor()
 email_text = ""
 openfile = open("SQLQueries2014-11-07.txt", 'r')
