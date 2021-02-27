@@ -145,10 +145,6 @@ Specifically looking for:
 
 
 
-<p><strong>Lisa Halstead, President</strong><br />
-Lisa Halstead is the Chief Operating Officer of CharityUSA.com, LLC, with more than 20 years of experience in technology marketing and management, and eight years generating funds for nonprofits through the Internet and online activism. Lisa brings expertise in organizational planning, personnel management, facilities management and public relations. She has volunteered with a number of health service and educational organizations throughout her career.</p>
-
-
 --> Active GTGM versions with a an active tex deductible price of less than $15
 
 select pv.productversion_id, p.customerprice from ecommerce.productversion as pv, ecommerce.item as i, ecommerce.price as p
@@ -475,99 +471,6 @@ and i.item_id not in (select ip.item_id from in_progress.work_unit as ip where i
 group by i.item_id, s.sku_id, s.name, s.item_id, s.initiallaunchdate
 order by i.item_id asc;
 
-
-
-$1,000 level: 11 months
-$2,000 level: 6 months
-$3,000 level: 5 months
-$4,000 level: 8 months (this was during the stock market doldrums!)
-$5,000 level: 3 months (and I added an extra $200 at the end)
-$6,000 level: 6 months 
-$7,000 level: 5 months
-$8,000 level: 2 months (Nov, Dec) 
-$9,000 level: 
-$10,000 level: 
-$11,000 level: 
-$12,000 level: 
-$13,000 level: 
-$14,000 level: 
-$15,000 level: 
-$16,000 level: 
-
-Looks like moving from $1K to $2K took 11 months
-and then moving from $2K to $4K took another 11 months
-and from $4K to $6K took another 11 months
-and from $6K to $8K took another 11 months. 
-I suppose I can expect that it will take 11 months total to reach $10K, and 2 are already gone -- so, 9 more months? say, September 2013? 
-
-
-
-How much money saved would be "enough"? 
-
-Three months of my own personal spending, ($500 out of about $1200 = 41.6%) 
-three months of my contributions to joint, (about $3,500 out of $4,875, = 72%)
-$10,000 in my Roth IRA. (8.5 out of 10, = 85%)
-
-$12,500 / $16,075 = 77.77% to current savings goals!
-
-(After these savings goals are reached, I will make new, higher ones for myself -- six months of my own personal spending, six months of my contributions to join, and $20K in my IRA!)
-
-
-
-New paycheck amount: $1145.71 (instead of $1251.83)
-
-$1912.19 (yay) minus $150 for Vanguard = $1762.19
-plus $1145.71 = $2907.90
-minus $1352.99 for Citi, $253.95 for AmEx, $116.41 for Nelnet, $54 for Sharebuilder = $1130.55
-
-Figure another $400 for food... and another $200 for misc... I should still have $530.55 to re-save. 
-
-I just moved a total of $282.22 into my three savings accounts so each one of the three is at $166.67. 
-I still owe myself more... maybe about another $250 more... but I'll hold off until the next paycheck, and rein in my spending in the meantime! :-)
-
-FIXED expenses: $150 Vanguard, $116.41 Nelnet, $54 Sharebuilder = $320.41 per month
-leaving a total of $825.30 to cover the month's household food, gas, household supplies and items, clothes, school stuff, restaurants, and entertainment. 
-
-
-
-
-
-
-
-
-title: Project Manager, Information Technology (IT)
-
-Payscale.com, Glassdoor.com, Salary.com
-Find range of salaries, then gauge where I fit into the hierarchy based on skills & experience. 
-
-dream companies
-tier 1
-tier 2
-
-
-natural networking
-
-
-
-
-
-
-
-
-Mindless Eating: Why We Eat More Than We Think
-A book ostensibly about our invisible eating habits that is actually a deeply researched, phenomenally interesting book on our behavior. If you've ever wondered why you can't lose weight even though you really want to, this book will explain how our situational circumstances are profoundly related to our behavior. Read this and you will never think the same about food or health again.
-
-Age of Propaganda: The Everyday Use and Abuse of Persuasion
-One of my favorite books on understanding why we behave the way we do. Aronson, the co-author, guest-lectured at Stanford and his class was one of the most thought-provoking ones I ever took. Learn how the media, our friends, and even we ourselves cause us to behave in unexpected ways. Each and every aspect of this book is rooted in theoretical literature, but it is incredibly fascinating to read.
-
-Influence: The Psychology of Persuasion
-The grandfather of all persuasion books, Cialdini put his years as the world's foremost persuasion expert into this book. Impressively, this book is equally interesting to the ordinary reader as it is to persuasion experts. He distills years of research into a few critical principles that help you understand how to influence others and yourself -- and how to protect yourself from unethical persuasion.
-
-Breakthrough Advertising
-One of the most sophisticated books on advertising ever written. Virtually every master-level direct-response copywriter has read this book once, and most read it every year, only to discover new insights. Be warned: This is extremely dense copy. I don't recommend it to anyone but experienced copywriters, marketers, and psychologists. But beneath the verbiage are profound insights that have stood the test of time.
-
-X The Social Animal
-Another book by Eliot Aronson, this is a terrific primer on how our environment shapes our behavior. If the average American read this book (and had the cognitive wherewithal to believe/trust it, which is another story), they would be shocked. For all the people who say, "Ugh! Fat people should just stop eating so much!" or "I would NEVER do ___" they would be terribly troubled to learn that a sophisticated persuader -- given enough time -- can create a situation powerful enough to persuade you to do almost anything. Murder. Gaining 45lbs. Allowing yourself to be abused. Or, on the positive side, to lose weight, become healthier, improve your vocabulary, manage your money, and become friendlier.
 
 
 
@@ -909,121 +812,6 @@ and i.itemstatus_id IN (0, 1)
 group by i.item_id,i.name,pv.name,s.sku_id,s.name 
 having sum (rs.quantity) > 0 
 order by s.sku_id desc;
-
-
-
-Alizarin: C14H8O4
-
-Rubia tinctorum.
-
-Flowering plant. Helsinki bot.g. (Kump.), Finland. Planted. 1999-09-06.
-Rubia tinctorum L.
-Engl.: madder, dyer's madder, Indian madder.
-Deu.: Krapp, Färberkrapp, Färberröte.
-Suom.: värimatara, krappi.
-Sven.: krapp.
-Fran.: garance, garance de teinturiers.
-Ital.: robbia.
-Port.: garanca.
-Bot. syn.: Rubia tinctoria Salisb.
-
-aka Manjishta (?), according to http://myfolia.com/plants/1464-common-madder-rubia-tinctorum
-
-More:
-http://www.winsornewton.com/resource-centre/product-articles/rose-madder-and-alizarin
-
-http://www.henriettesherbal.com/eclectic/kings/rubia.html
-"Animals fed upon madder have their bones colored red by it."
-
-Where to buy madder extract:
-http://www.wildcolours.co.uk/html/dye_extracts.html
-
-
-C14   See fourteen 
-H 8   aitch eight: 
-O 4   oh four. 
-
-
-
-
-
-Step 1
-Go to www.linkedin.com/companyDir?industries=/
-
-Choose 10-15 industries
-
-- Computer Software
-- Computer Networking
-- Internet
-- Information Technology and Services
-- Computer and Network Security
-- Information Services
-- Libraries
-- Writing and Editing
-- Online Publishing
-- International Affairs
-- International Trade and Development
-- Publishing
-
-
-
-
-Step 2. 
-Open another window, go to home page, advanced search
-fill in title (__ OR __)
-check the boxes for industries
-click search
-
-
-surf through people, look at places they've worked. 
-
-sort by relationship
-
-click connections
-sort by zip
-optional, enter school
-
-now you have a list of people. Study their background, specifically the companies they've worked at. 
-cloud research, study the conpany
-write down companies 
-write down people's names if you'd like to contact them. 
-
-Also, you can also see the arc of people's careers as they move around. 
-
-Pull down at least 5 tier 2 companies. 5-10 would be better. Write them down, write down the job titles. 
-
-Azaleos - Collaboration Engineer (Dale Kim)
-UW
-OCLC
-
-http://www.linkedin.com/profile/view?id=3020494&authType=name&authToken=EGC8&goback=%2Enpv_4830260_*1_*1_OUT*4OF*4NETWORK_fhJW_*1_*1_*1_*1_*1_*1_*1_*1_*1_*1_*1_*1_*1_*1_*1_*1
-
-
-
-Do 30 minutes of research on each company. read at least the first 2 pages of results on Google. Add the CEO's name and "interview" and Google that too. 
-
-
-http://www.linkedin.com/jsearch?type=jobs&keywords=Functional+Project+Manager%2C+Technical+Documentation&pplSearchOrigin=GLHD&pageKey=fcs_results&search=Search
-
-http://www.linkedin.com/jsearch?type=jobs&keywords=Functional+Project+Manager%2C+Technical+Documentation&pplSearchOrigin=GLHD&pageKey=fcs_results&search=Search
-
-http://www.linkedin.com/csearch/results?facet_I=103&csrfToken=ajax%3A0936287375950426769
-
-http://www.linkedin.com/csearch/results?facet_I=4&csrfToken=ajax%3A0936287375950426769
-
-http://www.linkedin.com/csearch/results?facet_I=6&csrfToken=ajax%3A0936287375950426769
-
-http://www.linkedin.com/csearch/results?facet_I=96&csrfToken=ajax%3A0936287375950426769
-
-
-
-Program Manager - Technical Communications
-VMC (Volt MAnagement Services)
-http://www.linkedin.com/profile/view?id=4717659&authType=OUT_OF_NETWORK&authToken=sBc4&locale=en_US&srchid=afeac1d6-091a-44a4-9397-4d5166a5bbe7-1&srchindex=2&srchtotal=17&goback=.fps_PBCK_*1_*2_*2_*2_Intranet+Manager_CP_*2_*2_*1_I_us_*2_*1_false_1_R_*1_*51_*1_*51_true_CC%2CN%2CI%2CPC%2CED%2CL%2CFG%2CTE%2CFA%2CSE%2CP%2CCS%2CF%2CDR%2CG_*2_*2_*2_*2_*2_1235_*2_*2_*2_*2_*2_*2_*2_*2_*2_*2_*2_*2_*2_*2&pvs=ps&trk=pp_profile_name_link
-
-
-
-
 
 
 LANDED COST QUERIES
@@ -1636,7 +1424,7 @@ where transaction_id = 13781542;
 
 
 --> Show any orders with more than one auth
-
+-
 select order_id,count(*) from ecommerce.paymentauthorization 
 where payment_status_id = 3 
 and payment_transaction_result_id = 1 
@@ -1893,19 +1681,15 @@ update ecommerce.purchaseorderlineitem set purchaseorder_id = 27420 where poline
 
 
 
+--> Activate a certain email account 
 
-
-
-
---> Activate account 'tkbo1@msn.com'
-
-update pheme.account set is_active = true where email = 'tkbo1@msn.com'; 
+update pheme.account set is_active = true where email = '<insert email here>'; 
 
 
 
 --> Change a user's e-mail address
 
-update pheme.account set email = 'thegirls@wi.rrr.com' where email = 'thrgirls@wi.rrr.com';
+update pheme.account set email = '<new email goes here>' where email = '<old email goes here>';
 
 
 
@@ -2309,12 +2093,12 @@ and gc.code like '%SWCCFSZ4CFCS9C%';
 
 
 
---> Look up the orders for e-mail address jo_sam_pug@yahoo.com, along with order line items and totals, and order adjustments. 
+--> Look up the orders for a certain e-mail address, along with order line items and totals, and order adjustments. 
 
 select o.oid, o.orderdate, o.processingstatus, li.customerprice, li.customerpriceadjustment, li.shippingcost, li.tax, li.productversion_id, li.quantity, li.iscompitem, li.fulfillmentdate, li.lineitemtype_id, li.promotion_id, o.adjustmentamount, o.shippingcost from ecommerce.rsorder as o, ecommerce.rslineitem as li, pheme.account as a
 where o.oid = li.order_id
 and o.account_id = a.account_id
-and a.email = 'jo_sam_pug@yahoo.com'
+and a.email = '<email goes here>'
 order by o.oid asc;
 
 
